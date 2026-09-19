@@ -3,328 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Villa Caetano Maintenance</title>
-
     <meta name="description" content="Villa Caetano property maintenance management">
-
+    <meta name="theme-color" content="#0f172a">
+    <title>Villa Caetano · Maintenance</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
-    <!-- LOGIN SCREEN -->
-    <div id="loginScreen" class="screen">
-
+    <!-- LOGIN -->
+    <div id="loginScreen" class="screen login-screen">
         <div class="login-card">
-
-            <div class="logo">🏡</div>
-
-            <h1>Villa Caetano</h1>
-
-            <p class="subtitle">Property Maintenance</p>
-
+            <div class="login-mark">VC</div>
+            <div class="eyebrow">VILLA CAETANO</div>
+            <h1>Property Maintenance</h1>
+            <p class="subtitle">Keep the villa running beautifully.</p>
             <button id="googleLoginBtn" class="google-button">
-                <span>G</span>
-                Sign in with Google
+                <span class="google-g">G</span>
+                <span>Continue with Google</span>
             </button>
-
+            <p class="login-note">Private maintenance dashboard</p>
         </div>
-
     </div>
 
-
-    <!-- MAIN APPLICATION -->
+    <!-- APP -->
     <div id="app" class="hidden">
-
-        <!-- HEADER -->
         <header class="topbar">
-
-            <div>
-                <h1>Villa Caetano</h1>
-                <span>Maintenance</span>
+            <div class="brand">
+                <div class="brand-mark">VC</div>
+                <div>
+                    <strong>Villa Caetano</strong>
+                    <span>Maintenance</span>
+                </div>
             </div>
-
             <div class="user-area">
-
-                <span id="userName"></span>
-
-                <button id="logoutBtn" class="logout-button">
-                    Logout
-                </button>
-
+                <div class="user-avatar" id="userAvatar">VC</div>
+                <div class="user-details">
+                    <strong id="userName">User</strong>
+                    <span>Signed in</span>
+                </div>
+                <button id="logoutBtn" class="icon-button" title="Log out" aria-label="Log out">↪</button>
             </div>
-
         </header>
 
-
-        <!-- DASHBOARD -->
         <main class="container">
-
-            <section class="welcome">
-
+            <section class="hero">
                 <div>
-                    <h2>Maintenance Dashboard</h2>
-                    <p>Keep track of everything that needs attention at the villa.</p>
+                    <div class="eyebrow">PROPERTY OVERVIEW</div>
+                    <h1>Good morning<span class="hero-dot">.</span></h1>
+                    <p>Stay on top of every repair, task and maintenance job.</p>
                 </div>
-
-                <button id="addIssueBtn" class="primary-button">
-                    + Add Issue
-                </button>
-
+                <button id="addIssueBtn" class="primary-button"><span>+</span> Add issue</button>
             </section>
 
-
-            <!-- STATISTICS -->
-
-            <section class="stats">
-
-                <div class="stat-card">
+            <section class="stats" aria-label="Maintenance summary">
+                <button class="stat-card stat-open" data-status-shortcut="Open">
+                    <span class="stat-icon">!</span>
                     <span class="stat-number" id="openCount">0</span>
                     <span class="stat-label">Open</span>
-                </div>
-
-                <div class="stat-card">
+                </button>
+                <button class="stat-card stat-progress" data-status-shortcut="In Progress">
+                    <span class="stat-icon">↗</span>
                     <span class="stat-number" id="progressCount">0</span>
-                    <span class="stat-label">In Progress</span>
-                </div>
-
-                <div class="stat-card">
+                    <span class="stat-label">In progress</span>
+                </button>
+                <button class="stat-card stat-overdue" data-status-shortcut="overdue">
+                    <span class="stat-icon">◷</span>
                     <span class="stat-number" id="overdueCount">0</span>
                     <span class="stat-label">Overdue</span>
-                </div>
-
-                <div class="stat-card">
+                </button>
+                <button class="stat-card stat-completed" data-status-shortcut="Completed">
+                    <span class="stat-icon">✓</span>
                     <span class="stat-number" id="completedCount">0</span>
                     <span class="stat-label">Completed</span>
-                </div>
-
+                </button>
             </section>
 
-
-            <!-- FILTERS -->
-
-            <section class="filters">
-
-                <input
-                    type="search"
-                    id="searchInput"
-                    placeholder="Search maintenance issues..."
-                >
-
-                <select id="statusFilter">
-
-                    <option value="all">All Statuses</option>
+            <section class="toolbar">
+                <div class="search-wrap">
+                    <span>⌕</span>
+                    <input type="search" id="searchInput" placeholder="Search issues, categories or people…" autocomplete="off">
+                </div>
+                <select id="statusFilter" aria-label="Filter by status">
+                    <option value="all">All statuses</option>
                     <option value="Open">Open</option>
-                    <option value="In Progress">In Progress</option>
+                    <option value="In Progress">In progress</option>
                     <option value="Waiting">Waiting</option>
                     <option value="Completed">Completed</option>
-
                 </select>
-
-                <select id="priorityFilter">
-
-                    <option value="all">All Priorities</option>
+                <select id="priorityFilter" aria-label="Filter by priority">
+                    <option value="all">All priorities</option>
                     <option value="Urgent">Urgent</option>
                     <option value="High">High</option>
                     <option value="Normal">Normal</option>
                     <option value="Low">Low</option>
-
                 </select>
-
+                <button id="clearFiltersBtn" class="clear-button hidden">Clear</button>
             </section>
-
-
-            <!-- ISSUES -->
 
             <section>
-
                 <div class="section-heading">
-
-                    <h2>Maintenance Issues</h2>
-
-                    <span id="issueCount">
-                        0 issues
-                    </span>
-
-                </div>
-
-                <div id="issuesList">
-
-                    <div class="empty-state">
-
-                        <div class="empty-icon">🔧</div>
-
-                        <h3>No maintenance issues</h3>
-
-                        <p>
-                            Everything looks good!
-                            Add an issue when something needs attention.
-                        </p>
-
+                    <div>
+                        <h2>Maintenance issues</h2>
+                        <p id="issueCount">0 issues</p>
                     </div>
-
+                    <div class="section-actions">
+                        <button id="activeViewBtn" class="view-button active">Active</button>
+                        <button id="historyViewBtn" class="view-button">History</button>
+                    </div>
                 </div>
-
+                <div id="issuesList"></div>
             </section>
-
         </main>
-
     </div>
-
 
     <!-- ADD ISSUE MODAL -->
-
-    <div id="issueModal" class="modal hidden">
-
+    <div id="issueModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="issueModalTitle">
         <div class="modal-card">
-
             <div class="modal-header">
-
-                <h2>Add Maintenance Issue</h2>
-
-                <button id="closeModalBtn" class="close-button">
-                    ×
-                </button>
-
-            </div>
-
-
-            <form id="issueForm">
-
-                <label>
-                    Issue title
-
-                    <input
-                        type="text"
-                        id="issueTitle"
-                        placeholder="e.g. Pool pump making noise"
-                        required
-                    >
-
-                </label>
-
-
-                <label>
-                    Category
-
-                    <select id="issueCategory" required>
-
-                        <option value="">Select category</option>
-                        <option>Pool</option>
-                        <option>Garden</option>
-                        <option>Electrical</option>
-                        <option>Plumbing</option>
-                        <option>Air Conditioning</option>
-                        <option>Building</option>
-                        <option>Security</option>
-                        <option>Cleaning</option>
-                        <option>Furniture</option>
-                        <option>Appliances</option>
-                        <option>Other</option>
-
-                    </select>
-
-                </label>
-
-
-                <label>
-                    Priority
-
-                    <select id="issuePriority">
-
-                        <option>Normal</option>
-                        <option>Low</option>
-                        <option>High</option>
-                        <option>Urgent</option>
-
-                    </select>
-
-                </label>
-
-
-                <label>
-                    Assigned to
-
-                    <input
-                        type="text"
-                        id="issueAssigned"
-                        placeholder="e.g. Caretaker"
-                    >
-
-                </label>
-
-
-                <label>
-                    Due date
-
-                    <input
-                        type="date"
-                        id="issueDueDate"
-                    >
-
-                </label>
-
-
-                <label>
-                    Estimated / actual cost
-
-                    <input
-                        type="number"
-                        id="issueCost"
-                        placeholder="₹ 0"
-                        min="0"
-                        step="0.01"
-                    >
-
-                </label>
-
-
-                <label>
-                    Description
-
-                    <textarea
-                        id="issueDescription"
-                        rows="4"
-                        placeholder="Describe the problem..."
-                    ></textarea>
-
-                </label>
-
-
-                <div class="form-actions">
-
-                    <button
-                        type="button"
-                        id="cancelIssueBtn"
-                        class="secondary-button"
-                    >
-                        Cancel
-                    </button>
-
-                    <button
-                        type="submit"
-                        class="primary-button"
-                    >
-                        Add Issue
-                    </button>
-
+                <div>
+                    <div class="eyebrow">NEW TASK</div>
+                    <h2 id="issueModalTitle">Add maintenance issue</h2>
                 </div>
-
+                <button id="closeModalBtn" class="close-button" aria-label="Close">×</button>
+            </div>
+            <form id="issueForm">
+                <div class="form-grid">
+                    <label class="full">
+                        Issue title
+                        <input type="text" id="issueTitle" placeholder="e.g. Pool pump making noise" required>
+                    </label>
+                    <label>
+                        Category
+                        <select id="issueCategory" required>
+                            <option value="">Select category</option>
+                            <option>Pool</option><option>Garden</option><option>Electrical</option>
+                            <option>Plumbing</option><option>Air Conditioning</option><option>Building</option>
+                            <option>Security</option><option>Cleaning</option><option>Furniture</option>
+                            <option>Appliances</option><option>Other</option>
+                        </select>
+                    </label>
+                    <label>
+                        Priority
+                        <select id="issuePriority">
+                            <option>Normal</option><option>Low</option><option>High</option><option>Urgent</option>
+                        </select>
+                    </label>
+                    <label>
+                        Assigned to
+                        <input type="text" id="issueAssigned" placeholder="e.g. Caretaker">
+                    </label>
+                    <label>
+                        Due date
+                        <input type="date" id="issueDueDate">
+                    </label>
+                    <label>
+                        Estimated / actual cost
+                        <input type="number" id="issueCost" placeholder="₹ 0" min="0" step="0.01">
+                    </label>
+                    <label class="full">
+                        Description / notes
+                        <textarea id="issueDescription" rows="4" placeholder="Describe the problem or work required…"></textarea>
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancelIssueBtn" class="secondary-button">Cancel</button>
+                    <button type="submit" class="primary-button">Create issue</button>
+                </div>
             </form>
-
         </div>
-
     </div>
 
+    <!-- DELETE CONFIRMATION -->
+    <div id="deleteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+        <div class="modal-card delete-card">
+            <div class="danger-mark">!</div>
+            <div class="eyebrow danger-text">PERMANENT ACTION</div>
+            <h2 id="deleteModalTitle">Delete this issue?</h2>
+            <p>This will permanently remove the maintenance record. This action cannot be undone.</p>
+            <div class="delete-target" id="deleteTarget"></div>
+            <label class="delete-confirm-label">
+                Type <strong>DELETE</strong> to confirm
+                <input type="text" id="deleteConfirmInput" autocomplete="off" placeholder="Type DELETE">
+            </label>
+            <div class="form-actions">
+                <button type="button" id="cancelDeleteBtn" class="secondary-button">Cancel</button>
+                <button type="button" id="confirmDeleteBtn" class="danger-button" disabled>Delete permanently</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- FIREBASE -->
+    <div id="toast" class="toast hidden"></div>
 
     <script type="module" src="firebase.js"></script>
-
-    <!-- APPLICATION -->
-
     <script type="module" src="app.js"></script>
-
 </body>
 </html>
