@@ -13,7 +13,12 @@
   <div class="login-card">
     <img class="brand-logo login-logo" src="logo.svg" alt="Villa Caetano">
     <p>Property Management</p>
-    <button id="loginBtn" class="google-button">Continue with Google</button>
+    <form id="loginForm" class="login-form">
+      <label>Email<input id="loginEmail" type="email" autocomplete="email" placeholder="Email address" required></label>
+      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password" required></label>
+      <button id="loginBtn" class="primary full" type="submit">Sign in</button>
+      <button id="resetPasswordBtn" class="link-button login-link" type="button">Forgot password?</button>
+    </form>
     <small id="loginError" class="error-text"></small>
   </div>
 </div>

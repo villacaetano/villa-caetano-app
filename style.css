@@ -3,3 +3,5 @@
 
 /* Villa Caetano branding */
 .brand-logo{display:block;color:inherit;object-fit:contain}.login-logo{width:min(280px,78vw);height:auto;margin:0 auto 12px}.brand-lockup{display:flex;align-items:center;gap:12px}.top-logo{width:190px;height:54px}.brand-lockup>span{font-size:12px;opacity:.72}@media(max-width:700px){.top-logo{width:160px;height:46px}.brand-lockup>span{display:none}}
+
+.login-form{display:flex;flex-direction:column;gap:12px;margin-top:18px}.login-form label{display:flex;flex-direction:column;gap:6px;text-align:left}.login-form input{width:100%;box-sizing:border-box}.full{width:100%}.login-link{margin-top:2px;text-align:center;width:100%}

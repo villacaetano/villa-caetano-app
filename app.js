@@ -45,26 +45,44 @@ async function loadAll(){
   issues=results[0].data||[]; recurring=results[1].data||[]; bills=results[2].data||[]; expenses=results[3].data||[];
 }
 
-$('loginBtn').onclick=async()=>{
+$('loginForm').onsubmit=async(e)=>{
+  e.preventDefault();
   if(loginBusy || !sb) return;
   loginBusy=true;
   const btn=$('loginBtn');
-  const original=btn.textContent;
   btn.disabled=true;
-  btn.textContent='Connecting to Google…';
+  btn.textContent='Signing in…';
   $('loginError').textContent='';
   try{
-    const redirectTo=location.origin+location.pathname;
-    const {error:e}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo}});
+    const email=$('loginEmail').value.trim();
+    const password=$('loginPassword').value;
+    const {error:e}=await sb.auth.signInWithPassword({email,password});
     if(e) throw e;
   }catch(e){
-    console.error('Google sign-in error:',e);
-    $('loginError').textContent=e?.message||'Unable to start Google sign-in.';
+    console.error('Email sign-in error:',e);
+    $('loginError').textContent=e?.message||'Unable to sign in.';
+  }finally{
     btn.disabled=false;
-    btn.textContent=original;
+    btn.textContent='Sign in';
     loginBusy=false;
   }
 };
+
+$('resetPasswordBtn').onclick=async()=>{
+  if(!sb) return;
+  const email=$('loginEmail').value.trim();
+  if(!email){
+    $('loginError').textContent='Enter your email address first, then click Forgot password.';
+    $('loginEmail').focus();
+    return;
+  }
+  const {error:e}=await sb.auth.resetPasswordForEmail(email,{
+    redirectTo: location.origin+location.pathname
+  });
+  if(e){ $('loginError').textContent=e.message; return; }
+  $('loginError').textContent='Password reset email sent. Check your inbox.';
+};
+
 $('logoutBtn').onclick=()=>sb.auth.signOut();
 $('quickAction').onclick=()=>openIssueModal();
 $('issueSearch').oninput=renderIssues; $('issueStatusFilter').onchange=renderIssues; $('issuePriorityFilter').onchange=renderIssues;
