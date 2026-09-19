@@ -131,7 +131,7 @@
       await enterApp();
     };
     $("logout-btn").onclick = async () => { await supabase.auth.signOut(); };
-    $("menu-btn").onclick = () => $("sidebar").classList.toggle("open");
+    $("menu-btn").onclick = () => { $("sidebar").classList.toggle("open"); $("sidebar-overlay").classList.toggle("show"); };    $("sidebar-overlay").onclick = () => { $("sidebar").classList.remove("open"); $("sidebar-overlay").classList.remove("show"); };
   }
 
   function bindNavigation() {
@@ -355,13 +355,13 @@
     if(!record)return;
     const actions=[];
     if(canEditRecord(type)) actions.push(`<button class="btn btn-secondary" id="action-edit">Edit</button>`);
-    if(type==="bills" && canFinance() && record.status!=="inactive") actions.push(`<button class="btn btn-primary" id="action-pay">Pay Bill</button>`);
+    if(type==="issues") actions.push(`<button class="btn btn-secondary" id="action-photos"><i class="ti ti-photo"></i> Photos & documents</button>`);    if(type==="bills" && canFinance() && record.status!=="inactive") actions.push(`<button class="btn btn-primary" id="action-pay">Pay Bill</button>`);
     if(type==="recurring_tasks" && canEditRecord(type)) actions.push(`<button class="btn btn-primary" id="action-complete">Complete</button>`);
     if(canDelete()) actions.push(`<button class="btn btn-danger" id="action-delete">Delete</button>`);
     openModal("Actions",`<div class="list">${actions.length?actions.join(""):`<div class="empty">No actions available for your role.</div>`}</div>`);
     if($("action-edit")) $("action-edit").onclick=()=>{closeModal(); type==="issues"?openIssueModal(id):type==="recurring_tasks"?openRecurringModal(id):type==="bills"?openBillModal(id):openExpenseModal(id);};
     if($("action-delete")) $("action-delete").onclick=async()=>{closeModal();if(await confirmDelete(`Delete this ${type.replace("_"," ")} permanently?`,"DELETE"))await deleteRecord(type,id);};
-    if($("action-pay")) $("action-pay").onclick=()=>{closeModal();openPayBillModal(record);};
+    if($("action-photos")) $("action-photos").onclick=()=>{closeModal();openAttachmentList("issue",id);};    if($("action-pay")) $("action-pay").onclick=()=>{closeModal();openPayBillModal(record);};
     if($("action-complete")) $("action-complete").onclick=()=>{closeModal();openCompleteRecurringModal(record);};
   }
 
@@ -396,11 +396,11 @@
           <div class="field"><label>Assigned people<select id="f-assigned" multiple size="4">${users.filter(u=>u.active).map(u=>`<option value="${u.id}" ${assigned.has(u.id)?"selected":""}>${esc(u.full_name||u.id)} — ${esc(ROLE_LABEL[u.role]||u.role)}</option>`).join("")}</select></label></div>
           <div class="field full"><label>Description<textarea id="f-description">${esc(r?.description)}</textarea></label></div>
           <div class="field full"><label>Notes<textarea id="f-notes">${esc(r?.notes)}</textarea></label></div>
-          <div class="field full"><label>Photos / documents<input id="f-files" class="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple><span class="calendar-note">JPG, JPEG, PNG, WEBP or PDF. Maximum 10 MB per file.</span></label></div>
+          <div class="field full"><label>Photos / documents<input id="f-files" class="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple><span class="calendar-note">JPG, JPEG, PNG, WEBP or PDF. Maximum 10 MB per file.</span></label>${id?`<button type="button" class="btn btn-secondary" id="view-attachments-btn"><i class="ti ti-photo"></i> View uploaded photos & documents</button>`:""}</div>
         </div>
         <div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div>
       </form>`);
-    $("cancel-form").onclick=closeModal;
+    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
     $("record-form").onsubmit=async e=>{
       e.preventDefault();
       const due=$("f-due").value;
@@ -434,13 +434,13 @@
       <div class="field full"><label>Notes<textarea id="f-notes">${esc(r?.notes)}</textarea></label></div>
       <div class="field full"><label>Photos / documents<input id="f-files" class="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple></label></div>
       </div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Save</button></div></form>`);
-    $("cancel-form").onclick=closeModal;
+    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
     $("record-form").onsubmit=async e=>{e.preventDefault();const payload={task_name:$("f-name").value.trim(),category:$("f-category").value,frequency:$("f-frequency").value,next_due:$("f-next").value||null,expected_cost:numOrNull($("f-cost").value),last_actual_cost:numOrNull($("f-lastcost").value),description:$("f-description").value.trim(),notes:$("f-notes").value.trim(),updated_at:nowISO()};if(!payload.task_name)return showToast("Task name is required.","error");let taskId=id;if(id){const {error}=await supabase.from("recurring_tasks").update(payload).eq("id",id);if(error)return showToast(`Save failed: ${error.message}`,"error");}else{payload.created_by=currentUser.id;const {data,error}=await supabase.from("recurring_tasks").insert(payload).select("id").single();if(error)return showToast(`Create failed: ${error.message}`,"error");taskId=data.id;}await uploadFiles("recurring_task",taskId,$("f-files").files);closeModal();showToast(id?"Recurring task updated.":"Recurring task created.");renderRecurring();};
   }
 
   async function openCompleteRecurringModal(r){
     openModal("Complete recurring task",`<form id="complete-form" class="modal-form"><div class="notice">Completion will record today's date, store the actual cost, calculate the next due date, and create an expense automatically.</div><div class="form-columns"><div class="field"><label>Actual cost<input id="complete-cost" type="number" min="0" step="0.01" value="${r.expected_cost??""}"></label></div><div class="field"><label>Completion date<input id="complete-date" type="date" value="${new Date().toISOString().slice(0,10)}"></label></div></div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Complete</button></div></form>`);
-    $("cancel-form").onclick=closeModal;
+    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
     $("complete-form").onsubmit=async e=>{e.preventDefault();const date=$("complete-date").value,cost=Number($("complete-cost").value||0);const next=nextDue(date,r.frequency);const {error}=await supabase.from("recurring_tasks").update({last_completed:date,last_actual_cost:cost,next_due:next,updated_at:nowISO()}).eq("id",r.id);if(error)return showToast(`Completion failed: ${error.message}`,"error");const {error:ee}=await supabase.from("expenses").insert({date,description:`${r.task_name} — recurring task`,category:r.category,amount:cost,source_type:"recurring_task",source_id:r.id,created_by:currentUser.id,notes:"Automatically created when recurring task was completed."});if(ee)return showToast(`Task completed, but expense creation failed: ${ee.message}`,"error");closeModal();showToast("Task completed and expense created.");renderRecurring();};
   }
 
@@ -458,13 +458,13 @@
       <div class="field full"><label>Notes<textarea id="f-notes">${esc(r?.notes)}</textarea></label></div>
       <div class="field full"><label>Bill documents<input id="f-files" class="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple></label></div>
       </div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Save</button></div></form>`);
-    $("cancel-form").onclick=closeModal;
+    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
     $("record-form").onsubmit=async e=>{e.preventDefault();const due=$("f-next").value;if(due && due<new Date().toISOString().slice(0,10) && !r)return showToast("Next due date cannot be in the past.","error");const payload={bill_name:$("f-name").value.trim(),category:$("f-category").value,frequency:$("f-frequency").value,expected_amount:numOrNull($("f-amount").value),next_due:due||null,status:$("f-status").value,notes:$("f-notes").value.trim(),updated_at:nowISO()};if(!payload.bill_name)return showToast("Bill name is required.","error");let billId=id;if(id){const {error}=await supabase.from("bills").update(payload).eq("id",id);if(error)return showToast(`Save failed: ${error.message}`,"error");}else{payload.created_by=currentUser.id;const {data,error}=await supabase.from("bills").insert(payload).select("id").single();if(error)return showToast(`Create failed: ${error.message}`,"error");billId=data.id;}await uploadFiles("bill",billId,$("f-files").files);closeModal();showToast(id?"Bill updated.":"Bill created.");renderBills();};
   }
 
   function openPayBillModal(r){
     openModal("Pay bill",`<form id="pay-form" class="modal-form"><div class="notice">Paying this bill creates an expense and advances the next due date according to its frequency.</div><div class="form-columns"><div class="field"><label>Actual amount paid<input id="pay-amount" type="number" min="0" step="0.01" value="${r.expected_amount??""}" required></label></div><div class="field"><label>Payment date<input id="pay-date" type="date" value="${new Date().toISOString().slice(0,10)}" required></label></div></div><div class="field"><label>Notes<textarea id="pay-notes"></textarea></label></div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Pay Bill</button></div></form>`);
-    $("cancel-form").onclick=closeModal;
+    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
     $("pay-form").onsubmit=async e=>{e.preventDefault();const date=$("pay-date").value,amount=Number($("pay-amount").value);const next=nextBillDue(date,r.frequency);const {error}=await supabase.from("bills").update({last_paid:date,last_paid_amount:amount,next_due:next,updated_at:nowISO()}).eq("id",r.id);if(error)return showToast(`Payment update failed: ${error.message}`,"error");const {error:ee}=await supabase.from("expenses").insert({date,description:`${r.bill_name} — bill`,category:r.category,amount,source_type:"bill",source_id:r.id,created_by:currentUser.id,notes:$("pay-notes").value.trim()});if(ee)return showToast(`Bill updated, but expense creation failed: ${ee.message}`,"error");closeModal();showToast("Bill paid and expense recorded.");renderBills();};
   }
   function nextBillDue(date,freq){const d=new Date(date+"T12:00:00");if(freq==="monthly")d.setMonth(d.getMonth()+1);else if(freq==="quarterly")d.setMonth(d.getMonth()+3);else if(freq==="yearly")d.setFullYear(d.getFullYear()+1);else d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10)}
@@ -481,12 +481,13 @@
       <div class="field full"><label>Receipt / document<input id="f-files" class="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple></label></div>
       </div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Save</button></div></form>`);
     if(r)$("f-source").value=r.source_type||"manual";
-    $("cancel-form").onclick=closeModal;
+    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
     $("record-form").onsubmit=async e=>{e.preventDefault();const payload={date:$("f-date").value,amount:Number($("f-amount").value),description:$("f-description").value.trim(),category:$("f-category").value.trim()||"Other",source_type:$("f-source").value,notes:$("f-notes").value.trim(),updated_at:nowISO()};if(!payload.description||!payload.amount)return showToast("Description and amount are required.","error");let expenseId=id;if(id){const {error}=await supabase.from("expenses").update(payload).eq("id",id);if(error)return showToast(`Save failed: ${error.message}`,"error");}else{payload.created_by=currentUser.id;const {data,error}=await supabase.from("expenses").insert(payload).select("id").single();if(error)return showToast(`Create failed: ${error.message}`,"error");expenseId=data.id;}await uploadFiles("expense",expenseId,$("f-files").files);closeModal();showToast(id?"Expense updated.":"Expense created.");renderExpenses();};
   }
 
   async function uploadFiles(recordType,recordId,fileList){
-    const files=[...(fileList||[])]; for(const file of files){
+    const files=[...(fileList||[])];
+    for(const file of files){
       if(file.size>10*1024*1024){showToast(`${file.name} is larger than 10 MB and was skipped.`,"error");continue;}
       const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
       const path=`${currentUser.id}/${recordType}/${recordId}/${crypto.randomUUID()}-${safe}`;
@@ -500,8 +501,30 @@
   async function openAttachmentList(type,id){
     const {data,error}=await supabase.from("attachments").select("*").eq("record_type",type).eq("record_id",id).order("created_at",{ascending:false});
     if(error)return showToast(`Attachments could not load: ${error.message}`,"error");
-    const html=data.length?`<div class="attachments">${data.map(a=>`<div class="attachment"><div class="attachment-info"><strong>${esc(a.original_filename)}</strong><br>${Math.round(a.file_size/1024)} KB</div></div>`).join("")}</div>`:`<div class="empty">No attachments.</div>`;
-    openModal("Attachments",html);
+    if(!data.length){openModal("Photos & documents",`<div class="empty">No photos or documents have been uploaded for this record.</div>`);return;}
+
+    const cards=[];
+    for(const a of data){
+      const {data:urlData,error:urlError}=await supabase.storage.from("property-attachments").createSignedUrl(a.storage_path,3600);
+      if(urlError || !urlData?.signedUrl){
+        cards.push(`<div class="attachment-card"><div class="attachment-file"><i class="ti ti-file-off"></i><span>Preview unavailable</span></div><div class="attachment-meta"><strong>${esc(a.original_filename)}</strong></div></div>`);
+        continue;
+      }
+      const url=urlData.signedUrl;
+      const isImage=(a.mime_type||"").startsWith("image/");
+      cards.push(isImage
+        ? `<div class="attachment-card"><img class="attachment-thumb" src="${esc(url)}" alt="${esc(a.original_filename)}" data-image-url="${esc(url)}" data-image-name="${esc(a.original_filename)}"><div class="attachment-meta"><strong title="${esc(a.original_filename)}">${esc(a.original_filename)}</strong><a href="${esc(url)}" target="_blank" rel="noopener">Open</a></div></div>`
+        : `<div class="attachment-card"><div class="attachment-file"><i class="ti ti-file-type-pdf"></i><strong>PDF document</strong><a href="${esc(url)}" target="_blank" rel="noopener">Open document</a></div><div class="attachment-meta"><strong title="${esc(a.original_filename)}">${esc(a.original_filename)}</strong></div></div>`
+      );
+    }
+    openModal("Photos & documents",`<div class="attachments">${cards.join("")}</div>`);
+    document.querySelectorAll(".attachment-thumb").forEach(img=>{
+      img.onclick=()=>openImagePreview(img.dataset.imageUrl,img.dataset.imageName);
+    });
+  }
+
+  function openImagePreview(url,name){
+    openModal(name || "Photo",`<div style="padding:14px"><img src="${esc(url)}" alt="${esc(name||"Attachment")}" style="display:block;width:100%;max-height:72vh;object-fit:contain;border-radius:8px;background:#f4f4f4"></div>`);
   }
 
   function openModal(title,body){

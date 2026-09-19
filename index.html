@@ -4,86 +4,99 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#173b32">
+  <meta name="description" content="Villa Caetano property management">
   <title>Villa Caetano — Property Management</title>
-  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="icon" href="villa-caetano-logo-black.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.35.0/tabler-icons.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app-error" class="app-error hidden"></div>
+  <div id="sidebar-overlay" class="sidebar-overlay"></div>
 
   <section id="auth-view" class="auth-shell">
     <div class="auth-card">
-      <div class="brand brand-centered">
-        <img src="logo.svg" alt="Villa Caetano logo" class="brand-logo">
-        <div>
-          <div class="brand-name">Villa Caetano</div>
-          <div class="brand-subtitle">Property Management</div>
-        </div>
+      <div class="auth-brand">
+        <img src="villa-caetano-logo-black.png" alt="Villa Caetano Goa" class="auth-logo">
+        <div class="auth-brand-line"></div>
+        <div class="auth-caption">PROPERTY MANAGEMENT</div>
       </div>
 
       <div id="login-panel">
         <h1>Welcome back</h1>
-        <p class="muted">Sign in to manage Villa Caetano.</p>
+        <p class="auth-intro">Sign in to manage Villa Caetano.</p>
         <form id="login-form" class="form-grid">
-          <label>Email<input id="login-email" type="email" autocomplete="email" required></label>
-          <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
-          <button class="btn btn-primary" type="submit">Sign In</button>
+          <label>Email<input id="login-email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+          <label>Password<input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" required></label>
+          <button class="btn btn-primary btn-block" type="submit"><i class="ti ti-login-2"></i> Sign in</button>
         </form>
         <button id="forgot-password-btn" class="link-button">Forgot password?</button>
       </div>
 
       <div id="forgot-panel" class="hidden">
         <h1>Reset password</h1>
-        <p class="muted">We'll send a secure password-reset link to your email.</p>
+        <p class="auth-intro">We'll send a secure password-reset link to your email.</p>
         <form id="forgot-form" class="form-grid">
-          <label>Email<input id="forgot-email" type="email" autocomplete="email" required></label>
-          <button class="btn btn-primary" type="submit">Send reset link</button>
+          <label>Email<input id="forgot-email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+          <button class="btn btn-primary btn-block" type="submit"><i class="ti ti-mail-forward"></i> Send reset link</button>
         </form>
         <button id="back-to-login-btn" class="link-button">Back to sign in</button>
       </div>
 
       <div id="set-password-panel" class="hidden">
         <h1>Set your password</h1>
-        <p class="muted">Choose a password to finish setting up your account.</p>
+        <p class="auth-intro">Choose a password to finish setting up your account.</p>
         <form id="set-password-form" class="form-grid">
           <label>New password<input id="new-password" type="password" minlength="8" autocomplete="new-password" required></label>
           <label>Confirm password<input id="confirm-password" type="password" minlength="8" autocomplete="new-password" required></label>
-          <button class="btn btn-primary" type="submit">Set Password</button>
+          <button class="btn btn-primary btn-block" type="submit"><i class="ti ti-lock-check"></i> Set password</button>
         </form>
       </div>
+
+      <div class="auth-footer">Villa Caetano · Goa</div>
     </div>
   </section>
 
   <section id="main-view" class="hidden">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
-        <img src="logo.svg" alt="" class="brand-logo">
-        <div><strong>Villa Caetano</strong><small>Property Management</small></div>
+        <img src="villa-caetano-logo-white.png" alt="Villa Caetano Goa" class="sidebar-logo">
       </div>
+      <div class="sidebar-section-label">PROPERTY</div>
       <nav id="nav">
-        <button class="nav-item active" data-section="dashboard">Dashboard</button>
-        <button class="nav-item" data-section="maintenance">Maintenance</button>
-        <button class="nav-item" data-section="recurring">Recurring</button>
-        <button class="nav-item" data-section="bills">Bills</button>
-        <button class="nav-item" data-section="expenses">Expenses</button>
-        <button class="nav-item admin-only" data-section="admin">Admin</button>
+        <button class="nav-item active" data-section="dashboard"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span></button>
+        <button class="nav-item" data-section="maintenance"><i class="ti ti-tool"></i><span>Maintenance</span></button>
+        <button class="nav-item" data-section="recurring"><i class="ti ti-refresh"></i><span>Recurring</span></button>
+        <button class="nav-item" data-section="bills"><i class="ti ti-receipt-2"></i><span>Bills</span></button>
+        <button class="nav-item" data-section="expenses"><i class="ti ti-wallet"></i><span>Expenses</span></button>
+      </nav>
+      <div class="sidebar-section-label admin-label admin-only">ACCOUNT</div>
+      <nav>
+        <button class="nav-item admin-only" data-section="admin"><i class="ti ti-users"></i><span>Users & access</span></button>
       </nav>
       <div class="sidebar-footer">
         <div id="current-user-mini" class="user-mini"></div>
-        <button id="logout-btn" class="nav-item logout">Sign out</button>
+        <button id="logout-btn" class="nav-item logout"><i class="ti ti-logout-2"></i><span>Sign out</span></button>
       </div>
     </aside>
 
     <main class="content">
       <header class="topbar">
-        <button id="menu-btn" class="icon-btn mobile-only" aria-label="Open menu">☰</button>
-        <div>
-          <div id="page-kicker" class="eyebrow">Villa Caetano</div>
-          <h1 id="page-title">Dashboard</h1>
+        <div class="topbar-left">
+          <button id="menu-btn" class="icon-btn mobile-only" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
+          <div>
+            <div id="page-kicker" class="eyebrow">Villa Caetano · Goa</div>
+            <h1 id="page-title">Dashboard</h1>
+          </div>
         </div>
-        <div id="header-user" class="header-user"></div>
+        <div class="topbar-right">
+          <div class="topbar-property"><i class="ti ti-home"></i><span>Villa Caetano</span></div>
+          <div class="topbar-user" id="header-user"></div>
+        </div>
       </header>
-
       <div id="page-content"></div>
     </main>
   </section>

@@ -1,6 +1,6 @@
 /*
   Villa Caetano — Supabase configuration
-  Paste ONLY your Supabase project URL and publishable key here.
+  The publishable key is safe for browser use.
   Never put a service_role/secret key in this file.
 */
 window.SUPABASE_CONFIG = {

@@ -128,3 +128,7 @@ real Villa Caetano logo later, replace logo.svg with the real asset.
 -------------------
 This is a static site. There is no npm install, Node.js, bundler, or
 build command.
+
+
+UI UPDATE
+The dashboard now uses an InApp-inspired Bootstrap-style layout and Villa Caetano branding. Uploaded issue photos/documents can be viewed from the maintenance Actions menu or the issue edit window.
