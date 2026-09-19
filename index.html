@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Villa Caetano Maintenance</title>
+
+    <meta name="description" content="Villa Caetano property maintenance management">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div id="loginScreen" class="screen">
+
+        <div class="login-card">
+
+            <div class="logo">🏡</div>
+
+            <h1>Villa Caetano</h1>
+
+            <p class="subtitle">Property Maintenance</p>
+
+            <button id="googleLoginBtn" class="google-button">
+                <span>G</span>
+                Sign in with Google
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- MAIN APPLICATION -->
+    <div id="app" class="hidden">
+
+        <!-- HEADER -->
+        <header class="topbar">
+
+            <div>
+                <h1>Villa Caetano</h1>
+                <span>Maintenance</span>
+            </div>
+
+            <div class="user-area">
+
+                <span id="userName"></span>
+
+                <button id="logoutBtn" class="logout-button">
+                    Logout
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- DASHBOARD -->
+        <main class="container">
+
+            <section class="welcome">
+
+                <div>
+                    <h2>Maintenance Dashboard</h2>
+                    <p>Keep track of everything that needs attention at the villa.</p>
+                </div>
+
+                <button id="addIssueBtn" class="primary-button">
+                    + Add Issue
+                </button>
+
+            </section>
+
+
+            <!-- STATISTICS -->
+
+            <section class="stats">
+
+                <div class="stat-card">
+                    <span class="stat-number" id="openCount">0</span>
+                    <span class="stat-label">Open</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-number" id="progressCount">0</span>
+                    <span class="stat-label">In Progress</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-number" id="overdueCount">0</span>
+                    <span class="stat-label">Overdue</span>
+                </div>
+
+                <div class="stat-card">
+                    <span class="stat-number" id="completedCount">0</span>
+                    <span class="stat-label">Completed</span>
+                </div>
+
+            </section>
+
+
+            <!-- FILTERS -->
+
+            <section class="filters">
+
+                <input
+                    type="search"
+                    id="searchInput"
+                    placeholder="Search maintenance issues..."
+                >
+
+                <select id="statusFilter">
+
+                    <option value="all">All Statuses</option>
+                    <option value="Open">Open</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Waiting">Waiting</option>
+                    <option value="Completed">Completed</option>
+
+                </select>
+
+                <select id="priorityFilter">
+
+                    <option value="all">All Priorities</option>
+                    <option value="Urgent">Urgent</option>
+                    <option value="High">High</option>
+                    <option value="Normal">Normal</option>
+                    <option value="Low">Low</option>
+
+                </select>
+
+            </section>
+
+
+            <!-- ISSUES -->
+
+            <section>
+
+                <div class="section-heading">
+
+                    <h2>Maintenance Issues</h2>
+
+                    <span id="issueCount">
+                        0 issues
+                    </span>
+
+                </div>
+
+                <div id="issuesList">
+
+                    <div class="empty-state">
+
+                        <div class="empty-icon">🔧</div>
+
+                        <h3>No maintenance issues</h3>
+
+                        <p>
+                            Everything looks good!
+                            Add an issue when something needs attention.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
+
+
+    <!-- ADD ISSUE MODAL -->
+
+    <div id="issueModal" class="modal hidden">
+
+        <div class="modal-card">
+
+            <div class="modal-header">
+
+                <h2>Add Maintenance Issue</h2>
+
+                <button id="closeModalBtn" class="close-button">
+                    ×
+                </button>
+
+            </div>
+
+
+            <form id="issueForm">
+
+                <label>
+                    Issue title
+
+                    <input
+                        type="text"
+                        id="issueTitle"
+                        placeholder="e.g. Pool pump making noise"
+                        required
+                    >
+
+                </label>
+
+
+                <label>
+                    Category
+
+                    <select id="issueCategory" required>
+
+                        <option value="">Select category</option>
+                        <option>Pool</option>
+                        <option>Garden</option>
+                        <option>Electrical</option>
+                        <option>Plumbing</option>
+                        <option>Air Conditioning</option>
+                        <option>Building</option>
+                        <option>Security</option>
+                        <option>Cleaning</option>
+                        <option>Furniture</option>
+                        <option>Appliances</option>
+                        <option>Other</option>
+
+                    </select>
+
+                </label>
+
+
+                <label>
+                    Priority
+
+                    <select id="issuePriority">
+
+                        <option>Normal</option>
+                        <option>Low</option>
+                        <option>High</option>
+                        <option>Urgent</option>
+
+                    </select>
+
+                </label>
+
+
+                <label>
+                    Assigned to
+
+                    <input
+                        type="text"
+                        id="issueAssigned"
+                        placeholder="e.g. Caretaker"
+                    >
+
+                </label>
+
+
+                <label>
+                    Due date
+
+                    <input
+                        type="date"
+                        id="issueDueDate"
+                    >
+
+                </label>
+
+
+                <label>
+                    Estimated / actual cost
+
+                    <input
+                        type="number"
+                        id="issueCost"
+                        placeholder="₹ 0"
+                        min="0"
+                        step="0.01"
+                    >
+
+                </label>
+
+
+                <label>
+                    Description
+
+                    <textarea
+                        id="issueDescription"
+                        rows="4"
+                        placeholder="Describe the problem..."
+                    ></textarea>
+
+                </label>
+
+
+                <div class="form-actions">
+
+                    <button
+                        type="button"
+                        id="cancelIssueBtn"
+                        class="secondary-button"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="primary-button"
+                    >
+                        Add Issue
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+    <!-- FIREBASE -->
+
+    <script type="module" src="firebase.js"></script>
+
+    <!-- APPLICATION -->
+
+    <script type="module" src="app.js"></script>
+
+</body>
+</html>
