@@ -12,8 +12,8 @@
     <!-- LOGIN -->
     <div id="loginScreen" class="screen login-screen">
         <div class="login-card">
-            <div class="login-mark">VC</div>
-            <div class="eyebrow">VILLA CAETANO</div>
+            <div class="login-logo-wrap"><img src="vcblack.png" class="login-logo" alt="Villa Caetano"></div>
+            <div class="eyebrow">PROPERTY MAINTENANCE</div>
             <h1>Property Maintenance</h1>
             <p class="subtitle">Keep the villa running beautifully.</p>
             <button id="googleLoginBtn" class="google-button">
@@ -28,7 +28,7 @@
     <div id="app" class="hidden">
         <header class="topbar">
             <div class="brand">
-                <div class="brand-mark">VC</div>
+                <img src="vcblack.png" class="brand-logo" alt="Villa Caetano">
                 <div>
                     <strong>Villa Caetano</strong>
                     <span>Maintenance</span>
@@ -147,13 +147,31 @@
                             <option>Normal</option><option>Low</option><option>High</option><option>Urgent</option>
                         </select>
                     </label>
-                    <label>
-                        Assigned to
-                        <input type="text" id="issueAssigned" placeholder="e.g. Caretaker">
+                    <label class="full">
+                        Who should handle this?
+                        <div class="multi-select" id="assignedPicker">
+                            <button type="button" class="multi-select-button" id="assignedButton">
+                                <span id="assignedButtonText">Select people / teams</span><span>⌄</span>
+                            </button>
+                            <div class="multi-select-menu hidden" id="assignedMenu">
+                                <label><input type="checkbox" value="Owner"> <span>Owner</span></label>
+                                <label><input type="checkbox" value="Caretaker"> <span>Caretaker</span></label>
+                                <label><input type="checkbox" value="Contractor"> <span>Contractor</span></label>
+                                <label><input type="checkbox" value="Property Management"> <span>Property Management</span></label>
+                                <label><input type="checkbox" value="Electrician"> <span>Electrician</span></label>
+                                <label><input type="checkbox" value="Plumber"> <span>Plumber</span></label>
+                                <label><input type="checkbox" value="Pool / Garden"> <span>Pool / Garden</span></label>
+                                <label><input type="checkbox" value="Other"> <span>Other</span></label>
+                                <input type="text" id="assignedOther" class="assigned-other" placeholder="Optional: type a name / company">
+                                <button type="button" class="done-select-button" id="assignedDoneBtn">Done</button>
+                            </div>
+                        </div>
+                        <small class="field-help">You can select more than one.</small>
                     </label>
                     <label>
                         Due date
                         <input type="date" id="issueDueDate">
+                        <small class="field-help">Choose today or a future date.</small>
                     </label>
                     <label>
                         Estimated / actual cost
@@ -204,13 +222,31 @@
                             <option>Normal</option><option>Low</option><option>High</option><option>Urgent</option>
                         </select>
                     </label>
-                    <label>
-                        Assigned to
-                        <input type="text" id="editIssueAssigned" placeholder="e.g. Caretaker">
+                    <label class="full">
+                        Who should handle this?
+                        <div class="multi-select" id="editAssignedPicker">
+                            <button type="button" class="multi-select-button" id="editAssignedButton">
+                                <span id="editAssignedButtonText">Select people / teams</span><span>⌄</span>
+                            </button>
+                            <div class="multi-select-menu hidden" id="editAssignedMenu">
+                                <label><input type="checkbox" value="Owner"> <span>Owner</span></label>
+                                <label><input type="checkbox" value="Caretaker"> <span>Caretaker</span></label>
+                                <label><input type="checkbox" value="Contractor"> <span>Contractor</span></label>
+                                <label><input type="checkbox" value="Property Management"> <span>Property Management</span></label>
+                                <label><input type="checkbox" value="Electrician"> <span>Electrician</span></label>
+                                <label><input type="checkbox" value="Plumber"> <span>Plumber</span></label>
+                                <label><input type="checkbox" value="Pool / Garden"> <span>Pool / Garden</span></label>
+                                <label><input type="checkbox" value="Other"> <span>Other</span></label>
+                                <input type="text" id="editAssignedOther" class="assigned-other" placeholder="Optional: type a name / company">
+                                <button type="button" class="done-select-button" id="editAssignedDoneBtn">Done</button>
+                            </div>
+                        </div>
+                        <small class="field-help">You can select more than one.</small>
                     </label>
                     <label>
                         Due date
                         <input type="date" id="editIssueDueDate">
+                        <small class="field-help" id="editDueHelp">Choose today or a future date.</small>
                     </label>
                     <label>
                         Estimated / actual cost

@@ -22,12 +22,70 @@ const activeViewBtn = $("activeViewBtn"), historyViewBtn = $("historyViewBtn");
 const deleteModal = $("deleteModal"), deleteConfirmInput = $("deleteConfirmInput");
 const confirmDeleteBtn = $("confirmDeleteBtn"), cancelDeleteBtn = $("cancelDeleteBtn");
 const editModal = $("editModal"), editIssueForm = $("editIssueForm");
+const assignedButton = $("assignedButton"), assignedButtonText = $("assignedButtonText"), assignedMenu = $("assignedMenu");
+const editAssignedButton = $("editAssignedButton"), editAssignedButtonText = $("editAssignedButtonText"), editAssignedMenu = $("editAssignedMenu");
 
 const categoryIcons = {
     Pool:"◉", Garden:"✦", Electrical:"⚡", Plumbing:"⌁",
     "Air Conditioning":"❄", Building:"⌂", Security:"◇",
     Cleaning:"✧", Furniture:"▣", Appliances:"▤", Other:"•"
 };
+
+function todayString() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function setDueDateMinimums() {
+    $("issueDueDate").min = todayString();
+    $("editIssueDueDate").min = todayString();
+}
+setDueDateMinimums();
+
+function setupAssignedPicker(button, buttonText, menu, otherInput) {
+    button.addEventListener("click", e => {
+        e.stopPropagation();
+        document.querySelectorAll(".multi-select-menu").forEach(m => {
+            if (m !== menu) m.classList.add("hidden");
+        });
+        menu.classList.toggle("hidden");
+    });
+    menu.querySelector(".done-select-button").addEventListener("click", e => {
+        e.stopPropagation();
+        updateAssignedButton(button, buttonText, menu, otherInput);
+        menu.classList.add("hidden");
+    });
+    menu.addEventListener("click", e => e.stopPropagation());
+    menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener("change", () => updateAssignedButton(button, buttonText, menu, otherInput));
+    });
+    otherInput.addEventListener("input", () => updateAssignedButton(button, buttonText, menu, otherInput));
+}
+function updateAssignedButton(button, buttonText, menu, otherInput) {
+    const values = [...menu.querySelectorAll('input[type="checkbox"]:checked')].map(x => x.value);
+    const custom = otherInput.value.trim();
+    if (custom) values.push(custom);
+    buttonText.textContent = values.length ? values.join(", ") : "Select people / teams";
+    button.classList.toggle("has-selection", values.length > 0);
+}
+function getAssignedValues(menu, otherInput) {
+    const values = [...menu.querySelectorAll('input[type="checkbox"]:checked')].map(x => x.value);
+    const custom = otherInput.value.trim();
+    if (custom) values.push(custom);
+    return [...new Set(values)];
+}
+function setAssignedValues(menu, otherInput, button, buttonText, rawValue) {
+    const values = Array.isArray(rawValue) ? rawValue : (rawValue ? [rawValue] : []);
+    menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = values.includes(cb.value));
+    const known = new Set([...menu.querySelectorAll('input[type="checkbox"]')].map(cb => cb.value));
+    otherInput.value = values.filter(v => !known.has(v)).join(", ");
+    updateAssignedButton(button, buttonText, menu, otherInput);
+}
+setupAssignedPicker(assignedButton, assignedButtonText, assignedMenu, $("assignedOther"));
+setupAssignedPicker(editAssignedButton, editAssignedButtonText, editAssignedMenu, $("editAssignedOther"));
+
+document.addEventListener("click", () => {
+    document.querySelectorAll(".multi-select-menu").forEach(m => m.classList.add("hidden"));
+});
 
 googleLoginBtn.addEventListener("click", async () => {
     googleLoginBtn.disabled = true;
@@ -70,17 +128,25 @@ issueModal.addEventListener("click", e => { if (e.target === issueModal) closeIs
 function closeIssueModal() {
     issueModal.classList.add("hidden");
     issueForm.reset();
+    setAssignedValues(assignedMenu, $("assignedOther"), assignedButton, assignedButtonText, []);
+    setDueDateMinimums();
 }
 
 issueForm.addEventListener("submit", async event => {
     event.preventDefault();
     if (!currentUser) return;
+    const dueDate = $("issueDueDate").value;
+    if (dueDate && dueDate < todayString()) {
+        alert("Due date cannot be in the past. Please choose today or a future date.");
+        $("issueDueDate").focus();
+        return;
+    }
     const issue = {
         title: $("issueTitle").value.trim(),
         category: $("issueCategory").value,
         priority: $("issuePriority").value,
-        assignedTo: $("issueAssigned").value.trim(),
-        dueDate: $("issueDueDate").value,
+        assignedTo: getAssignedValues(assignedMenu, $("assignedOther")),
+        dueDate,
         cost: Number($("issueCost").value) || 0,
         description: $("issueDescription").value.trim(),
         status: "Open",
@@ -117,7 +183,8 @@ function renderIssues() {
     const today = localDateString();
 
     let filtered = issues.filter(issue => {
-        const matchesSearch = [issue.title, issue.description, issue.category, issue.assignedTo]
+        const assignedSearch = Array.isArray(issue.assignedTo) ? issue.assignedTo.join(" ") : (issue.assignedTo || "");
+        const matchesSearch = [issue.title, issue.description, issue.category, assignedSearch]
             .some(v => String(v || "").toLowerCase().includes(search));
         const matchesPriority = priority === "all" || issue.priority === priority;
         const isOverdue = issue.status !== "Completed" && issue.dueDate && issue.dueDate < today;
@@ -174,6 +241,7 @@ function createIssueCard(issue) {
     const costText = Number(issue.cost) ? `₹${Number(issue.cost).toLocaleString("en-IN", {maximumFractionDigits:2})}` : "";
     const icon = categoryIcons[issue.category] || "•";
     const categoryClass = `category-${safeClass(issue.category)}`;
+    const assignees = Array.isArray(issue.assignedTo) ? issue.assignedTo : (issue.assignedTo ? [issue.assignedTo] : []);
 
     card.innerHTML = `
         <div class="issue-main">
@@ -187,7 +255,7 @@ function createIssueCard(issue) {
                     <span class="badge ${categoryClass}">${icon} ${escapeHtml(issue.category || "Other")}</span>
                     <span class="badge priority-${safeClass(issue.priority)}">${escapeHtml(issue.priority || "Normal")}</span>
                     <span class="badge status-${safeClass(issue.status)}">${completed ? "✓ Done" : escapeHtml(issue.status || "Open")}</span>
-                    ${issue.assignedTo ? `<span class="badge">👤 ${escapeHtml(issue.assignedTo)}</span>` : ""}
+                    ${assignees.length ? `<span class="badge assignee-chip">👤 ${escapeHtml(assignees.join(" · "))}</span>` : ""}
                     ${dueText ? `<span class="badge ${overdue ? "overdue" : ""}">${overdue ? "⚠ " : "📅 "}${escapeHtml(dueText)}${overdue ? " · Overdue" : ""}</span>` : ""}
                     ${costText ? `<span class="badge">₹ ${costText.replace("₹","")}</span>` : ""}
                     ${completed && issue.completedAt ? `<span class="badge">✓ ${escapeHtml(formatDateTime(issue.completedAt))}</span>` : ""}
@@ -257,8 +325,16 @@ function openEditModal(issue) {
     $("editIssueTitle").value = issue.title || "";
     $("editIssueCategory").value = issue.category || "";
     $("editIssuePriority").value = issue.priority || "Normal";
-    $("editIssueAssigned").value = issue.assignedTo || "";
+    setAssignedValues(editAssignedMenu, $("editAssignedOther"), editAssignedButton, editAssignedButtonText, issue.assignedTo);
     $("editIssueDueDate").value = issue.dueDate || "";
+    const editDueHelp = $("editDueHelp");
+    if (issue.dueDate && issue.dueDate < todayString()) {
+        $("editIssueDueDate").removeAttribute("min");
+        editDueHelp.textContent = "This issue is already overdue. Leave the date unchanged or choose today / a future date.";
+    } else {
+        $("editIssueDueDate").min = todayString();
+        editDueHelp.textContent = "Choose today or a future date.";
+    }
     $("editIssueCost").value = Number(issue.cost) || "";
     $("editIssueStatus").value = issue.status || "Open";
     $("editIssueDescription").value = issue.description || "";
@@ -278,11 +354,17 @@ editIssueForm.addEventListener("submit", async event => {
     event.preventDefault();
     if (!editTargetIssue) return;
     const newStatus = $("editIssueStatus").value;
+    const newDueDate = $("editIssueDueDate").value;
+    if (newDueDate && newDueDate < todayString() && newDueDate !== (editTargetIssue.dueDate || "")) {
+        alert("Due date cannot be in the past. Please choose today or a future date.");
+        $("editIssueDueDate").focus();
+        return;
+    }
     const updates = {
         title: $("editIssueTitle").value.trim(),
         category: $("editIssueCategory").value,
         priority: $("editIssuePriority").value,
-        assignedTo: $("editIssueAssigned").value.trim(),
+        assignedTo: getAssignedValues(editAssignedMenu, $("editAssignedOther")),
         dueDate: $("editIssueDueDate").value,
         cost: Number($("editIssueCost").value) || 0,
         status: newStatus,
@@ -351,6 +433,8 @@ historyViewBtn.addEventListener("click", () => setView("history"));
 
 function setView(view) {
     activeView = view;
+    // Tabs are the broad view. Choosing a specific status remains the explicit override.
+    statusFilter.value = "all";
     activeViewBtn.classList.toggle("active", view === "active");
     historyViewBtn.classList.toggle("active", view === "history");
     renderIssues();
