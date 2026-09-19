@@ -1,111 +1,91 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#173b32">
-  <meta name="description" content="Villa Caetano property management">
-  <title>Villa Caetano — Property Management</title>
-  <link rel="icon" href="villa-caetano-logo-black.png" type="image/png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.35.0/tabler-icons.min.css">
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Villa Caetano property management dashboard">
+  <title>Villa Caetano | Property Management</title>
+  <link rel="icon" href="assets/images/favicon/favicon.ico">
+  <link rel="stylesheet" href="assets/css/bootstrap.min.css">
+  <link rel="stylesheet" href="assets/vendors/bootstrap-icons/bootstrap-icons.css">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/villa-caetano.css">
 </head>
 <body>
-  <div id="app-error" class="app-error hidden"></div>
-  <div id="sidebar-overlay" class="sidebar-overlay"></div>
+  <div id="app-error" class="app-error d-none"></div>
 
-  <section id="auth-view" class="auth-shell">
-    <div class="auth-card">
-      <div class="auth-brand">
-        <img src="villa-caetano-logo-black.png" alt="Villa Caetano Goa" class="auth-logo">
-        <div class="auth-brand-line"></div>
-        <div class="auth-caption">PROPERTY MANAGEMENT</div>
+  <section id="auth-view" class="auth-page d-none">
+    <button class="icon-button theme-toggle auth-theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme"><i class="bi bi-moon-stars" data-theme-icon></i></button>
+    <div class="auth-card vc-auth-card">
+      <div class="vc-auth-brand">
+        <img src="assets/images/villa-caetano-logo-black.png" alt="Villa Caetano">
       </div>
-
+      <div class="auth-visual vc-login-visual">
+        <div class="vc-login-overlay"><span class="eyebrow">PROPERTY MANAGEMENT</span><h2>Everything for Villa Caetano, in one place.</h2><p>Income, expenses, maintenance, bills and property operations.</p></div>
+      </div>
       <div id="login-panel">
-        <h1>Welcome back</h1>
-        <p class="auth-intro">Sign in to manage Villa Caetano.</p>
-        <form id="login-form" class="form-grid">
-          <label>Email<input id="login-email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
-          <label>Password<input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" required></label>
-          <button class="btn btn-primary btn-block" type="submit"><i class="ti ti-login-2"></i> Sign in</button>
-        </form>
-        <button id="forgot-password-btn" class="link-button">Forgot password?</button>
-      </div>
-
-      <div id="forgot-panel" class="hidden">
-        <h1>Reset password</h1>
-        <p class="auth-intro">We'll send a secure password-reset link to your email.</p>
-        <form id="forgot-form" class="form-grid">
-          <label>Email<input id="forgot-email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
-          <button class="btn btn-primary btn-block" type="submit"><i class="ti ti-mail-forward"></i> Send reset link</button>
-        </form>
-        <button id="back-to-login-btn" class="link-button">Back to sign in</button>
-      </div>
-
-      <div id="set-password-panel" class="hidden">
-        <h1>Set your password</h1>
-        <p class="auth-intro">Choose a password to finish setting up your account.</p>
-        <form id="set-password-form" class="form-grid">
-          <label>New password<input id="new-password" type="password" minlength="8" autocomplete="new-password" required></label>
-          <label>Confirm password<input id="confirm-password" type="password" minlength="8" autocomplete="new-password" required></label>
-          <button class="btn btn-primary btn-block" type="submit"><i class="ti ti-lock-check"></i> Set password</button>
+        <p class="eyebrow mb-1">Secure Access</p><h1 class="h3 mb-1">Welcome back</h1><p class="text-muted mb-4">Sign in to your Villa Caetano workspace.</p>
+        <form id="login-form" class="needs-validation" novalidate>
+          <div class="mb-3"><label class="form-label">Email address</label><input id="login-email" class="form-control" type="email" required></div>
+          <div class="mb-3"><div class="d-flex justify-content-between"><label class="form-label">Password</label><button type="button" class="btn btn-link p-0 small" id="forgot-password-btn">Forgot?</button></div><input id="login-password" class="form-control" type="password" required></div>
+          <button class="btn btn-vc w-100" type="submit"><i class="bi bi-box-arrow-in-right me-1"></i> Sign In</button>
         </form>
       </div>
-
-      <div class="auth-footer">Villa Caetano · Goa</div>
+      <div id="forgot-panel" class="d-none"><p class="eyebrow mb-1">Account Recovery</p><h1 class="h3">Reset password</h1><p class="text-muted">We'll send a secure reset link.</p><form id="forgot-form"><div class="mb-3"><label class="form-label">Email address</label><input id="forgot-email" class="form-control" type="email" required></div><button class="btn btn-vc w-100">Send Reset Link</button></form><button class="btn btn-link mt-3 p-0" id="back-to-login-btn">Back to login</button></div>
+      <div id="set-password-panel" class="d-none"><p class="eyebrow mb-1">Secure Access</p><h1 class="h3">Set your password</h1><form id="set-password-form"><div class="mb-3"><label class="form-label">New password</label><input id="new-password" class="form-control" type="password" required></div><div class="mb-3"><label class="form-label">Confirm password</label><input id="confirm-password" class="form-control" type="password" required></div><button class="btn btn-vc w-100">Set Password</button></form></div>
+      <div class="auth-footer mt-4">Villa Caetano · Goa</div>
     </div>
   </section>
 
-  <section id="main-view" class="hidden">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
-        <img src="villa-caetano-logo-white.png" alt="Villa Caetano Goa" class="sidebar-logo">
-      </div>
-      <div class="sidebar-section-label">PROPERTY</div>
-      <nav id="nav">
-        <button class="nav-item active" data-section="dashboard"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span></button>
-        <button class="nav-item" data-section="maintenance"><i class="ti ti-tool"></i><span>Maintenance</span></button>
-        <button class="nav-item" data-section="recurring"><i class="ti ti-refresh"></i><span>Recurring</span></button>
-        <button class="nav-item" data-section="bills"><i class="ti ti-receipt-2"></i><span>Bills</span></button>
-        <button class="nav-item" data-section="expenses"><i class="ti ti-wallet"></i><span>Expenses</span></button>
+  <div id="main-view" class="admin-shell d-none">
+    <div class="sidebar-backdrop" id="sidebar-overlay"></div>
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Main navigation">
+      <div class="sidebar-header vc-sidebar-brand"><a class="brand-mark" href="#dashboard"><img src="assets/images/villa-caetano-logo-white.png" alt="Villa Caetano"></a></div>
+      <nav class="sidebar-nav">
+        <a class="nav-link active" href="#dashboard" data-section="dashboard"><span class="nav-icon"><i class="bi bi-speedometer2"></i></span><span class="nav-text">Dashboard</span></a>
+        <a class="nav-link" href="#income" data-section="income"><span class="nav-icon"><i class="bi bi-cash-stack"></i></span><span class="nav-text">Income</span></a>
+        <a class="nav-link" href="#expenses" data-section="expenses"><span class="nav-icon"><i class="bi bi-wallet2"></i></span><span class="nav-text">Expenses</span></a>
+        <a class="nav-link" href="#utilities" data-section="utilities"><span class="nav-icon"><i class="bi bi-lightning-charge"></i></span><span class="nav-text">Utilities</span></a>
+        <a class="nav-link" href="#maintenance" data-section="maintenance"><span class="nav-icon"><i class="bi bi-tools"></i></span><span class="nav-text">Maintenance</span></a>
+        <a class="nav-link" href="#recurring" data-section="recurring"><span class="nav-icon"><i class="bi bi-arrow-repeat"></i></span><span class="nav-text">Recurring</span></a>
+        <a class="nav-link" href="#bills" data-section="bills"><span class="nav-icon"><i class="bi bi-receipt"></i></span><span class="nav-text">Bills</span></a>
+        <div class="sidebar-section-label">Management</div>
+        <a class="nav-link admin-only" href="#admin" data-section="admin"><span class="nav-icon"><i class="bi bi-people"></i></span><span class="nav-text">Users & Access</span></a>
+        <a class="nav-link" href="#charts" data-section="charts"><span class="nav-icon"><i class="bi bi-bar-chart-line"></i></span><span class="nav-text">Analytics</span></a>
+        <div class="sidebar-section-label">Template</div>
+        <a class="nav-link" href="html/tables.html"><span class="nav-icon"><i class="bi bi-table"></i></span><span class="nav-text">Tables</span></a>
+        <a class="nav-link" href="html/forms.html"><span class="nav-icon"><i class="bi bi-ui-checks-grid"></i></span><span class="nav-text">Forms</span></a>
+        <a class="nav-link" href="html/components.html"><span class="nav-icon"><i class="bi bi-grid-3x3-gap"></i></span><span class="nav-text">Components</span></a>
+        <a class="nav-link" href="html/settings.html"><span class="nav-icon"><i class="bi bi-gear"></i></span><span class="nav-text">Settings</span></a>
       </nav>
-      <div class="sidebar-section-label admin-label admin-only">ACCOUNT</div>
-      <nav>
-        <button class="nav-item admin-only" data-section="admin"><i class="ti ti-users"></i><span>Users & access</span></button>
-      </nav>
-      <div class="sidebar-footer">
-        <div id="current-user-mini" class="user-mini"></div>
-        <button id="logout-btn" class="nav-item logout"><i class="ti ti-logout-2"></i><span>Sign out</span></button>
-      </div>
+      <div class="sidebar-user"><img class="avatar-img avatar-md sidebar-user-avatar" src="assets/images/avatar/avatar.jpg" alt="User"><strong id="sidebar-name">Villa Caetano</strong><small id="sidebar-role">Owner</small></div>
+      <div class="sidebar-footer"><span class="status-dot"></span><span class="sidebar-footer-text">Property workspace active</span></div>
     </aside>
 
-    <main class="content">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button id="menu-btn" class="icon-btn mobile-only" aria-label="Open menu"><i class="ti ti-menu-2"></i></button>
-          <div>
-            <div id="page-kicker" class="eyebrow">Villa Caetano · Goa</div>
-            <h1 id="page-title">Dashboard</h1>
-          </div>
+    <div class="admin-main">
+      <nav class="navbar admin-navbar navbar-expand bg-white"><div class="container-fluid px-3 px-lg-4">
+        <button class="sidebar-toggle" type="button" id="menu-btn" aria-label="Toggle sidebar"><span></span><span></span><span></span></button>
+        <form class="d-none d-md-flex ms-3 flex-grow-1" id="global-search-form"><input class="form-control search-input" id="global-search" type="search" placeholder="Search property records..."></form>
+        <div class="navbar-actions ms-auto">
+          <button class="icon-button theme-toggle" type="button" data-theme-toggle><i class="bi bi-moon-stars" data-theme-icon></i></button>
+          <div class="dropdown"><button class="icon-button" type="button" data-bs-toggle="dropdown"><i class="bi bi-bell"></i></button><div class="dropdown-menu dropdown-menu-end notification-menu" id="notifications-menu"><div class="dropdown-header fw-bold">Property alerts</div><div class="dropdown-item text-muted">Loading…</div></div></div>
+          <div class="dropdown"><button class="profile-button dropdown-toggle" type="button" data-bs-toggle="dropdown"><img class="avatar-img avatar-sm" src="assets/images/avatar/avatar.jpg"><span class="profile-name d-none d-sm-inline" id="header-user">Owner</span></button><ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" href="#admin">Users & Access</a></li><li><hr class="dropdown-divider"></li><li><button class="dropdown-item" id="logout-btn">Sign out</button></li></ul></div>
         </div>
-        <div class="topbar-right">
-          <div class="topbar-property"><i class="ti ti-home"></i><span>Villa Caetano</span></div>
-          <div class="topbar-user" id="header-user"></div>
-        </div>
-      </header>
-      <div id="page-content"></div>
-    </main>
-  </section>
+      </div></nav>
+      <main class="dashboard-content"><div class="container-fluid px-3 px-lg-4 py-4"><div id="page-content"></div></div></main>
+      <footer class="admin-footer"><div class="container-fluid px-3 px-lg-4"><span>Villa Caetano · Goa</span><span>Property Management Workspace</span></div></footer>
+    </div>
+  </div>
 
-  <div id="modal-root"></div>
-  <div id="toast-root" class="toast-root"></div>
+  <div class="modal fade" id="record-modal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="record-modal-title">Add record</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="record-modal-body"></div><div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-vc" id="record-save-btn">Save</button></div></div></div></div>
+  <div class="modal fade" id="view-modal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="view-modal-title">Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="view-modal-body"></div></div></div></div>
+  <div id="toast-root" class="vc-toast-root"></div>
 
+  <script src="assets/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js"></script>
+  <script src="assets/js/main.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

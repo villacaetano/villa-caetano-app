@@ -1,541 +1,104 @@
 (() => {
-  "use strict";
+  'use strict';
+  const cfg = window.SUPABASE_CONFIG || {};
+  const $ = (id) => document.getElementById(id);
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const money = (v) => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(v||0));
+  const money2 = (v) => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(v||0));
+  const fmtDate = (v) => v ? new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(v)) : '—';
+  const monthLabel = (v) => new Intl.DateTimeFormat('en-GB',{month:'short',year:'numeric'}).format(new Date(v));
+  const todayISO = () => new Date().toISOString().slice(0,10);
+  const ROLE_LABEL = {owner:'Owner',property_manager:'Property Manager',caretaker:'Caretaker',contractor:'Contractor',reporter:'Reporter'};
+  const isAdmin = () => ['owner','property_manager'].includes(state.profile?.role);
+  const state = { sb:null, user:null, profile:null, section:'dashboard', settings:{management_percent:40,gst_percent:18}, modal:null, charts:{} };
 
-  const config = window.SUPABASE_CONFIG || {};
-  const errorBox = document.getElementById("app-error");
-  const authView = document.getElementById("auth-view");
-  const mainView = document.getElementById("main-view");
-  const pageContent = document.getElementById("page-content");
-  const modalRoot = document.getElementById("modal-root");
-  const toastRoot = document.getElementById("toast-root");
+  function toast(message,type='ok'){const e=document.createElement('div');e.className=`vc-toast ${type==='error'?'error':''}`;e.textContent=message;$('toast-root').appendChild(e);setTimeout(()=>e.remove(),4500)}
+  function error(message){$('app-error').innerHTML=`<strong>Application diagnostic</strong><br>${esc(message)}`;$('app-error').classList.remove('d-none')}
+  function clearError(){$('app-error').classList.add('d-none')}
+  function supabaseCheck(){if(!window.supabase)return 'Supabase client did not load.';if(!cfg.url||!cfg.publishableKey)return 'Supabase configuration is missing. Check supabase.js.';return null}
+  function setTheme(){const saved=localStorage.getItem('vc-theme')||'light';document.documentElement.setAttribute('data-theme',saved);document.documentElement.setAttribute('data-bs-theme',saved);document.querySelectorAll('[data-theme-toggle]').forEach(b=>b.onclick=()=>{const n=(document.documentElement.getAttribute('data-theme')||'light')==='dark'?'light':'dark';localStorage.setItem('vc-theme',n);document.documentElement.setAttribute('data-theme',n);document.documentElement.setAttribute('data-bs-theme',n);document.querySelectorAll('[data-theme-icon]').forEach(i=>i.className=n==='dark'?'bi bi-sun':'bi bi-moon-stars')});document.querySelectorAll('[data-theme-icon]').forEach(i=>i.className=saved==='dark'?'bi bi-sun':'bi bi-moon-stars')}
 
-  let supabase = null;
-  let currentUser = null;
-  let currentProfile = null;
-  let currentSection = "dashboard";
-  let currentRecords = [];
-  let currentRecordType = null;
+  function showAuth(panel='login'){$('auth-view').classList.remove('d-none');$('main-view').classList.add('d-none');['login-panel','forgot-panel','set-password-panel'].forEach(x=>$(x).classList.add('d-none'));$(panel==='forgot'?'forgot-panel':panel==='set-password'?'set-password-panel':'login-panel').classList.remove('d-none')}
+  function showApp(){$('auth-view').classList.add('d-none');$('main-view').classList.remove('d-none')}
 
-  const ROLE = { OWNER:"owner", MANAGER:"property_manager", CARETAKER:"caretaker", CONTRACTOR:"contractor", REPORTER:"reporter" };
-  const ROLE_LABEL = {
-    owner:"Owner", property_manager:"Property Manager", caretaker:"Caretaker",
-    contractor:"Contractor", reporter:"Reporter"
-  };
-
-  const $ = id => document.getElementById(id);
-  const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-  const dateFmt = value => value ? new Intl.DateTimeFormat(undefined,{day:"2-digit",month:"short",year:"numeric"}).format(new Date(value)) : "—";
-  const money = value => value == null || value === "" ? "—" : new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(Number(value));
-  const nowISO = () => new Date().toISOString();
-  const isAdmin = () => [ROLE.OWNER,ROLE.MANAGER].includes(currentProfile?.role);
-  const canDelete = () => isAdmin();
-  const canFinance = () => isAdmin();
-  const canManageUsers = () => isAdmin();
-  const canEditRecord = type => {
-    if (isAdmin()) return true;
-    if (["caretaker","contractor"].includes(currentProfile?.role)) return type === "issues" || type === "recurring_tasks";
-    return ["reporter"].includes(currentProfile?.role) && type === "issues";
-  };
-
-  function showToast(message, type="ok") {
-    const el = document.createElement("div");
-    el.className = `toast ${type === "error" ? "error" : ""}`;
-    el.textContent = message;
-    toastRoot.appendChild(el);
-    setTimeout(() => el.remove(), 4200);
-  }
-  function showAppError(message) {
-    errorBox.innerHTML = `<strong>Application diagnostic:</strong><br>${esc(message)}`;
-    errorBox.classList.remove("hidden");
-  }
-  function clearAppError(){ errorBox.classList.add("hidden"); errorBox.textContent = ""; }
-
-  function supabaseDiagnostic() {
-    if (!window.supabase) return "Supabase CDN did not load. Check your internet connection or CDN access.";
-    if (!config.url || config.url.includes("PASTE_")) return "Supabase Project URL is missing. Open supabase.js and paste your Project URL.";
-    if (!config.publishableKey || config.publishableKey.includes("PASTE_")) return "Supabase publishable key is missing. Open supabase.js and paste the publishable key.";
-    if (!/^https:\/\/.+\.supabase\.co$/.test(config.url)) return "Supabase URL does not look like a valid project URL. Copy it from Supabase Project Settings → API.";
-    return null;
+  async function init(){
+    setTheme(); const diag=supabaseCheck(); if(diag){error(diag);showAuth();return}
+    state.sb=window.supabase.createClient(cfg.url,cfg.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    bindAuth(); bindShell();
+    state.sb.auth.onAuthStateChange(async(event,session)=>{if(event==='SIGNED_OUT'){state.user=null;state.profile=null;showAuth();}else if(event==='PASSWORD_RECOVERY'){state.user=session?.user;showAuth('set-password')}else if(event==='SIGNED_IN'&&session?.user){state.user=session.user;await enter()}});
+    const {data,error:sessionError}=await state.sb.auth.getSession(); if(sessionError){error(sessionError.message);showAuth();return}
+    if(data.session?.user){state.user=data.session.user; if(location.hash.includes('recovery')) showAuth('set-password'); else await enter()} else showAuth();
   }
 
-  async function init() {
-    const diagnostic = supabaseDiagnostic();
-    if (diagnostic) { showAppError(diagnostic); showAuth(); return; }
-    try {
-      supabase = window.supabase.createClient(config.url, config.publishableKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-      });
-    } catch (e) {
-      showAppError(`JavaScript could not initialise Supabase: ${e.message}`);
-      showAuth(); return;
-    }
+  function bindAuth(){
+    $('forgot-password-btn').onclick=()=>showAuth('forgot');$('back-to-login-btn').onclick=()=>showAuth('login');
+    $('login-form').onsubmit=async e=>{e.preventDefault();const {data,error:e1}=await state.sb.auth.signInWithPassword({email:$('login-email').value.trim(),password:$('login-password').value});if(e1)return toast(e1.message,'error');state.user=data.user;await enter()};
+    $('forgot-form').onsubmit=async e=>{e.preventDefault();const {error:e1}=await state.sb.auth.resetPasswordForEmail($('forgot-email').value.trim(),{redirectTo:location.origin+location.pathname});if(e1)return toast(e1.message,'error');toast('Password reset link sent.')};
+    $('set-password-form').onsubmit=async e=>{e.preventDefault();const p=$('new-password').value,c=$('confirm-password').value;if(p.length<8)return toast('Password must be at least 8 characters.','error');if(p!==c)return toast('Passwords do not match.','error');const {error:e1}=await state.sb.auth.updateUser({password:p});if(e1)return toast(e1.message,'error');history.replaceState({},document.title,location.pathname);toast('Password updated.');await enter()};
+    $('logout-btn').onclick=()=>state.sb.auth.signOut();
+  }
+  function bindShell(){
+    $('menu-btn').onclick=()=>{$('adminSidebar').classList.toggle('open');$('sidebar-overlay').classList.toggle('show')};$('sidebar-overlay').onclick=()=>{$('adminSidebar').classList.remove('open');$('sidebar-overlay').classList.remove('show')};
+    document.querySelectorAll('[data-section]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();state.section=a.dataset.section;history.replaceState(null,'','#'+state.section);document.querySelectorAll('[data-section]').forEach(x=>x.classList.toggle('active',x===a));$('adminSidebar').classList.remove('open');$('sidebar-overlay').classList.remove('show');render()}));
+    $('global-search-form').onsubmit=e=>{e.preventDefault();toast('Search is available inside each management table.');};
+  }
+  async function enter(){
+    clearError();showApp();
+    const {data,error:e}=await state.sb.from('profiles').select('*').eq('id',state.user.id).single();
+    if(e)return error(`Signed in, but your profile could not be loaded: ${e.message}`);state.profile=data;if(!data.active){await state.sb.auth.signOut();return toast('Your account is inactive.','error')}
+    $('sidebar-name').textContent=data.full_name||state.user.email;$('sidebar-role').textContent=ROLE_LABEL[data.role]||data.role;$('header-user').textContent=data.full_name||state.user.email;document.querySelectorAll('.admin-only').forEach(x=>x.classList.toggle('d-none',!isAdmin()));
+    await loadSettings(); state.section=(location.hash||'#dashboard').slice(1)||'dashboard'; if(!['dashboard','income','expenses','utilities','maintenance','recurring','bills','admin','charts'].includes(state.section))state.section='dashboard'; document.querySelectorAll('[data-section]').forEach(x=>x.classList.toggle('active',x.dataset.section===state.section));render();
+  }
+  async function loadSettings(){try{const {data}=await state.sb.from('property_settings').select('*').eq('id',1).maybeSingle();if(data)state.settings=data}catch(e){/* extension may not have been run yet */}}
+  async function q(table,select='*'){const {data,error:e}=await state.sb.from(table).select(select);if(e)throw e;return data||[]}
+  function pageHead(eyebrow,title,sub,button=''){return `<div class="page-heading"><div class="page-heading-copy"><span class="page-icon"><i class="bi bi-building"></i></span><div><p class="eyebrow mb-1">${esc(eyebrow)}</p><h1 class="h3 mb-1">${esc(title)}</h1><p class="text-muted mb-0">${esc(sub)}</p></div></div>${button?`<div class="heading-actions">${button}</div>`:''}</div>`}
+  function metric(label,value,note,kind='primary'){return `<div class="col-12 col-sm-6 col-xl-3"><article class="metric-card metric-${kind}"><div class="metric-top"><span class="metric-label">${esc(label)}</span><span class="metric-icon"><i class="bi ${kind==='success'?'bi-graph-up-arrow':kind==='warning'?'bi-lightning-charge':kind==='danger'?'bi-exclamation-circle':'bi-cash-stack'}"></i></span></div><div class="metric-value">${esc(value)}</div><div class="metric-meta"><span>${esc(note||'')}</span></div></article></div>`}
+  function openModal(title,body,save){$('record-modal-title').textContent=title;$('record-modal-body').innerHTML=body;$('record-save-btn').onclick=save;bootstrap.Modal.getOrCreateInstance($('record-modal')).show()}
+  function closeModal(){bootstrap.Modal.getOrCreateInstance($('record-modal')).hide()}
+  function viewModal(title,body){$('view-modal-title').textContent=title;$('view-modal-body').innerHTML=body;bootstrap.Modal.getOrCreateInstance($('view-modal')).show()}
+  function rowActions(id, type){return `<div class="dropdown"><button class="btn btn-light btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button class="dropdown-item" data-action="view" data-id="${id}" data-type="${type}">View</button></li>${isAdmin()?`<li><button class="dropdown-item text-danger" data-action="delete" data-id="${id}" data-type="${type}">Delete</button></li>`:''}</ul></div>`}
+  function bindTableActions(){document.querySelectorAll('[data-action]').forEach(b=>b.onclick=async()=>{const id=b.dataset.id,type=b.dataset.type;if(b.dataset.action==='view')return viewRecord(type,id);if(b.dataset.action==='delete')return deleteRecord(type,id)})}
+  async function deleteRecord(type,id){if(!confirm('This will permanently delete the record. Continue?'))return;const phrase=prompt('Type DELETE to confirm');if(phrase!=='DELETE')return toast('Deletion cancelled.','error');const {error:e}=await state.sb.from(type).delete().eq('id',id);if(e)return toast(e.message,'error');toast('Record deleted.');render()}
 
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-        if (session?.user) {
-          currentUser = session.user;
-          if (event === "PASSWORD_RECOVERY") showSetPassword();
-          else await enterApp();
-        }
-      }
-      if (event === "SIGNED_OUT") { currentUser = null; currentProfile = null; showAuth(); }
-    });
+  async function render(){clearError();try{if(state.section==='dashboard')return renderDashboard();if(state.section==='income')return renderIncome();if(state.section==='expenses')return renderExpenses();if(state.section==='utilities')return renderUtilities();if(state.section==='maintenance')return renderMaintenance();if(state.section==='recurring')return renderRecurring();if(state.section==='bills')return renderBills();if(state.section==='admin')return renderAdmin();if(state.section==='charts')return renderCharts()}catch(e){error(e.message||String(e))}}
 
-    const { data, error } = await supabase.auth.getSession();
-    if (error) { showAppError(`Authentication session could not be read: ${error.message}`); showAuth(); return; }
-    if (data.session?.user) {
-      currentUser = data.session.user;
-      const recovery = window.location.hash.includes("type=recovery");
-      if (recovery) showSetPassword(); else await enterApp();
-    } else showAuth();
-
-    bindAuth();
-    bindNavigation();
+  async function renderDashboard(){
+    const [income,expenses,issues,bills,utilities]=await Promise.all([q('income'),q('expenses'),q('issues'),q('bills'),q('utility_readings')]);
+    const now=new Date(),m0=new Date(now.getFullYear(),now.getMonth(),1),y0=new Date(now.getFullYear(),0,1);
+    const monthIncome=income.filter(x=>new Date(x.income_date)>=m0).reduce((s,x)=>s+Number(x.total_with_gst||0),0);const yearIncome=income.filter(x=>new Date(x.income_date)>=y0).reduce((s,x)=>s+Number(x.total_with_gst||0),0);const monthExp=expenses.filter(x=>new Date(x.date)>=m0).reduce((s,x)=>s+Number(x.amount||0),0);const open=issues.filter(x=>x.status!=='completed').length;const overdue=issues.filter(x=>x.status!=='completed'&&x.due_date&&new Date(x.due_date)<now).length;const nextBills=bills.filter(x=>x.status!=='inactive'&&x.next_due).sort((a,b)=>new Date(a.next_due)-new Date(b.next_due)).slice(0,5);
+    const months=Array.from({length:6},(_,i)=>{const d=new Date(now.getFullYear(),now.getMonth()-5+i,1);return {key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,label:d.toLocaleDateString('en-GB',{month:'short'})}});
+    const series=months.map(m=>income.filter(x=>String(x.income_date).slice(0,7)===m.key).reduce((s,x)=>s+Number(x.total_with_gst||0),0));
+    $('page-content').innerHTML=pageHead('Villa Caetano','Dashboard','A property overview of income, spending, operations and upcoming work.',`<button class="btn btn-vc btn-sm" id="quick-income"><i class="bi bi-plus-lg"></i> Add Income</button>`)+`<section class="row g-3 mt-1">${metric('Income this month',money(monthIncome),'Gross incl. GST','primary')}${metric('Income this year',money(yearIncome),'Gross incl. GST','success')}${metric('Expenses this month',money(monthExp),'Recorded expenses','warning')}${metric('Open maintenance',open,`${overdue} overdue`,'danger')}</section>
+      <section class="row g-3 mt-3"><div class="col-12 col-xl-8"><div class="table-card p-3"><div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Income trend</h2><p class="text-muted small mb-0">Last six months</p></div><a class="btn btn-light btn-sm" href="#income">View Income</a></div><div class="chart-wrap"><canvas id="incomeChart"></canvas></div></div></div><div class="col-12 col-xl-4"><div class="table-card p-3 h-100"><div class="d-flex justify-content-between mb-3"><div><h2 class="h5 mb-1">Upcoming bills</h2><p class="text-muted small mb-0">Next due items</p></div><a class="btn btn-light btn-sm" href="#bills">View</a></div>${nextBills.length?nextBills.map(b=>`<div class="d-flex justify-content-between border-bottom py-3"><div><strong>${esc(b.bill_name)}</strong><div class="small text-muted">${esc(b.category||'Bill')}</div></div><div class="text-end"><strong>${money(b.expected_amount)}</strong><div class="small text-muted">${fmtDate(b.next_due)}</div></div></div>`).join(''):'<div class="empty-state">No upcoming bills.</div>'}</div></div></section>
+      <section class="row g-3 mt-3"><div class="col-12 col-xl-6"><div class="table-card p-3"><h2 class="h5 mb-3">Income vs expenses</h2><div class="chart-wrap-sm"><canvas id="cashflowChart"></canvas></div></div></div><div class="col-12 col-xl-6"><div class="table-card p-3"><h2 class="h5 mb-3">Property snapshot</h2><div class="kpi-strip"><div class="kpi-mini"><div class="label">Management share</div><div class="value">${Number(state.settings.management_percent||40)}%</div></div><div class="kpi-mini"><div class="label">GST</div><div class="value">${Number(state.settings.gst_percent||18)}%</div></div><div class="kpi-mini"><div class="label">Utility entries</div><div class="value">${utilities.length}</div></div><div class="kpi-mini"><div class="label">Maintenance</div><div class="value">${issues.length}</div></div></div><div class="mt-4"><p class="small text-muted mb-1">Owner income recorded</p><h3 class="mb-0">${money(income.reduce((s,x)=>s+Number(x.owner_received||0),0))}</h3></div></div></div></section>`;
+    $('quick-income').onclick=()=>openIncomeModal();
+    if(window.Chart){state.charts.income?.destroy();state.charts.cash?.destroy();state.charts.income=new Chart($('incomeChart'),{type:'bar',data:{labels:months.map(x=>x.label),datasets:[{label:'Gross income',data:series,borderRadius:6,backgroundColor:'#1f4b3a'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'₹'+Number(v).toLocaleString('en-IN')}}}}});const expSeries=months.map(m=>expenses.filter(x=>String(x.date).slice(0,7)===m.key).reduce((s,x)=>s+Number(x.amount||0),0));state.charts.cash=new Chart($('cashflowChart'),{type:'line',data:{labels:months.map(x=>x.label),datasets:[{label:'Income',data:series,borderColor:'#1f4b3a',backgroundColor:'rgba(31,75,58,.1)',fill:true,tension:.35},{label:'Expenses',data:expSeries,borderColor:'#a55d43',backgroundColor:'rgba(165,93,67,.08)',fill:true,tension:.35}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}})}
   }
 
-  function showAuth(panel="login") {
-    authView.classList.remove("hidden"); mainView.classList.add("hidden");
-    ["login-panel","forgot-panel","set-password-panel"].forEach(id => $(id).classList.add("hidden"));
-    $(panel === "login" ? "login-panel" : panel === "forgot" ? "forgot-panel" : "set-password-panel").classList.remove("hidden");
-  }
+  function incomeCalc(owner,mgmt,gst){owner=Number(owner)||0;mgmt=Number(mgmt)||0;gst=Number(gst)||0;const gross=mgmt>=100?owner:owner/(1-mgmt/100);const management=gross-owner;const gstAmt=gross*gst/100;return {owner,gross,management,gstAmt,total:gross+gstAmt}}
+  function openIncomeModal(){const s=state.settings;openModal('Add Property Income',`<form id="income-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Income date</label><input id="income-date" class="form-control" type="date" value="${todayISO()}" required></div><div class="col-md-4"><label class="form-label">Source</label><input id="income-source" class="form-control" value="Villa Caetano"></div><div class="col-md-4"><label class="form-label">Reference</label><input id="income-ref" class="form-control" placeholder="Booking / month"></div><div class="col-md-4"><label class="form-label">Amount I received (₹)</label><input id="income-owner" class="form-control" type="number" min="0" step="0.01" required></div><div class="col-md-4"><label class="form-label">Management share (%)</label><input id="income-mgmt" class="form-control" type="number" min="0" max="99.99" step="0.01" value="${s.management_percent}"></div><div class="col-md-4"><label class="form-label">GST (%)</label><input id="income-gst" class="form-control" type="number" min="0" max="100" step="0.01" value="${s.gst_percent}"></div><div class="col-12"><div class="calc-box"><div class="calc-line"><span>Owner amount received</span><strong id="calc-owner">₹0</strong></div><div class="calc-line"><span>Management share</span><strong id="calc-management">₹0</strong></div><div class="calc-line"><span>Gross before GST</span><strong id="calc-gross">₹0</strong></div><div class="calc-line"><span>GST</span><strong id="calc-gst">₹0</strong></div><div class="calc-line calc-total"><span>Total property value</span><strong id="calc-total">₹0</strong></div><div class="formula-note mt-2">For a 60/40 split, your received amount is treated as 60% of the gross before GST. The management amount is calculated automatically.</div></div></div><div class="col-12"><label class="form-label">Notes</label><textarea id="income-notes" class="form-control" rows="2"></textarea></div></div></form>`,async()=>{const owner=$('income-owner').value,mg=$('income-mgmt').value,gst=$('income-gst').value;const c=incomeCalc(owner,mg,gst);const payload={income_date:$('income-date').value,source:$('income-source').value.trim()||'Villa Caetano',reference:$('income-ref').value.trim(),owner_received:c.owner,management_percent:Number(mg),management_amount:c.management,gross_before_gst:c.gross,gst_percent:Number(gst),gst_amount:c.gstAmt,total_with_gst:c.total,notes:$('income-notes').value.trim(),created_by:state.user.id};const {error:e}=await state.sb.from('income').insert(payload);if(e)return toast(e.message,'error');closeModal();toast('Income recorded.');render();});['income-owner','income-mgmt','income-gst'].forEach(id=>{setTimeout(()=>$(id)?.addEventListener('input',update),20)});function update(){const c=incomeCalc($('income-owner').value,$('income-mgmt').value,$('income-gst').value);$('calc-owner').textContent=money2(c.owner);$('calc-management').textContent=money2(c.management);$('calc-gross').textContent=money2(c.gross);$('calc-gst').textContent=money2(c.gstAmt);$('calc-total').textContent=money2(c.total)}}
+  async function renderIncome(){const rows=await q('income');rows.sort((a,b)=>new Date(b.income_date)-new Date(a.income_date));const total=rows.reduce((s,x)=>s+Number(x.total_with_gst||0),0),owner=rows.reduce((s,x)=>s+Number(x.owner_received||0),0),mg=rows.reduce((s,x)=>s+Number(x.management_amount||0),0);$('page-content').innerHTML=pageHead('Finance','Income','Record what you receive and automatically calculate management share, gross value and GST.',`<button class="btn btn-vc btn-sm" id="add-income"><i class="bi bi-plus-lg"></i> Add Income</button>`)+`<section class="row g-3 mt-1">${metric('Owner received',money(owner),'Recorded receipts','primary')}${metric('Management share',money(mg),'Calculated','warning')}${metric('Property gross',money(total),'Including GST','success')}${metric('Entries',rows.length,'Income records','danger')}</section><div class="table-card mt-3"><div class="p-3 border-bottom d-flex justify-content-between align-items-center"><div><h2 class="h5 mb-1">Income register</h2><p class="text-muted small mb-0">Spreadsheet-style property income ledger.</p></div><input class="form-control form-control-sm w-auto" id="income-search" placeholder="Search..."></div><div class="table-responsive"><table class="table align-middle" id="income-table"><thead><tr><th>Date</th><th>Reference</th><th>Owner received</th><th>Mgmt %</th><th>Mgmt amount</th><th>Gross before GST</th><th>GST</th><th>Total</th><th></th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td>${fmtDate(x.income_date)}</td><td><strong>${esc(x.reference||'—')}</strong><div class="small text-muted">${esc(x.source||'Villa Caetano')}</div></td><td class="money">${money2(x.owner_received)}</td><td>${Number(x.management_percent||0)}%</td><td class="money">${money2(x.management_amount)}</td><td class="money">${money2(x.gross_before_gst)}</td><td class="money">${money2(x.gst_amount)} <span class="small text-muted">(${Number(x.gst_percent||0)}%)</span></td><td class="money fw-bold">${money2(x.total_with_gst)}</td><td>${rowActions(x.id,'income')}</td></tr>`).join(''):`<tr><td colspan="9"><div class="empty-state">No income recorded yet.</div></td></tr>`}</tbody></table></div></div>`;$('add-income').onclick=openIncomeModal;$('income-search').oninput=e=>{const q=e.target.value.toLowerCase();document.querySelectorAll('#income-table tbody tr').forEach(r=>r.hidden=q&&!r.textContent.toLowerCase().includes(q))};bindTableActions()}
 
-  function showSetPassword(){ showAuth("set-password"); }
+  async function renderExpenses(){const rows=await q('expenses');rows.sort((a,b)=>new Date(b.date)-new Date(a.date));const total=rows.reduce((s,x)=>s+Number(x.amount||0),0),month=rows.filter(x=>String(x.date).slice(0,7)===todayISO().slice(0,7)).reduce((s,x)=>s+Number(x.amount||0),0);$('page-content').innerHTML=pageHead('Finance','Expenses','Record operating costs and link them to bills or maintenance.',`<button class="btn btn-vc btn-sm" id="add-expense"><i class="bi bi-plus-lg"></i> Add Expense</button>`)+`<section class="row g-3 mt-1">${metric('Total expenses',money(total),'All recorded','primary')}${metric('This month',money(month),'Current month','warning')}${metric('Records',rows.length,'Expense entries','success')}${metric('Average',money(rows.length?total/rows.length:0),'Per record','danger')}</section><div class="table-card mt-3"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Source</th><th></th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td>${fmtDate(x.date)}</td><td>${esc(x.description)}</td><td><span class="badge badge-soft">${esc(x.category||'General')}</span></td><td class="money fw-bold">${money2(x.amount)}</td><td>${esc(x.source_type||'Manual')}</td><td>${rowActions(x.id,'expenses')}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-state">No expenses recorded.</div></td></tr>`}</tbody></table></div></div>`;$('add-expense').onclick=openExpenseModal;bindTableActions()}
+  function openExpenseModal(){openModal('Add Expense',`<form id="expense-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Date</label><input id="expense-date" class="form-control" type="date" value="${todayISO()}"></div><div class="col-md-4"><label class="form-label">Amount (₹)</label><input id="expense-amount" class="form-control" type="number" min="0" step="0.01" required></div><div class="col-md-4"><label class="form-label">Category</label><input id="expense-category" class="form-control" placeholder="Electricity, repair..."></div><div class="col-12"><label class="form-label">Description</label><input id="expense-description" class="form-control" required></div><div class="col-md-4"><label class="form-label">Source</label><select id="expense-source" class="form-select"><option>Manual</option><option>Bill</option><option>Maintenance</option><option>Recurring</option></select></div><div class="col-12"><label class="form-label">Notes</label><textarea id="expense-notes" class="form-control"></textarea></div></div></form>`,async()=>{const p={date:$('expense-date').value,amount:Number($('expense-amount').value),category:$('expense-category').value,description:$('expense-description').value,source_type:$('expense-source').value,notes:$('expense-notes').value,created_by:state.user.id};const {error:e}=await state.sb.from('expenses').insert(p);if(e)return toast(e.message,'error');closeModal();toast('Expense recorded.');render()})}
 
-  function bindAuth() {
-    $("forgot-password-btn").onclick = () => showAuth("forgot");
-    $("back-to-login-btn").onclick = () => showAuth("login");
-    $("login-form").onsubmit = async e => {
-      e.preventDefault(); clearAppError();
-      const email = $("login-email").value.trim(), password = $("login-password").value;
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) { showToast(`Sign in failed: ${error.message}`, "error"); return; }
-      currentUser = data.user; await enterApp();
-    };
-    $("forgot-form").onsubmit = async e => {
-      e.preventDefault();
-      const email = $("forgot-email").value.trim();
-      const redirectTo = window.location.origin + window.location.pathname;
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-      if (error) { showToast(`Could not send reset email: ${error.message}`, "error"); return; }
-      showToast("Reset link sent. Check your email.");
-    };
-    $("set-password-form").onsubmit = async e => {
-      e.preventDefault();
-      const p = $("new-password").value, c = $("confirm-password").value;
-      if (p.length < 8) return showToast("Password must be at least 8 characters.", "error");
-      if (p !== c) return showToast("The passwords do not match.", "error");
-      const { error } = await supabase.auth.updateUser({ password:p });
-      if (error) { showToast(`Password update failed: ${error.message}`, "error"); return; }
-      window.history.replaceState({}, document.title, window.location.pathname);
-      showToast("Password set successfully.");
-      await enterApp();
-    };
-    $("logout-btn").onclick = async () => { await supabase.auth.signOut(); };
-    $("menu-btn").onclick = () => { $("sidebar").classList.toggle("open"); $("sidebar-overlay").classList.toggle("show"); };    $("sidebar-overlay").onclick = () => { $("sidebar").classList.remove("open"); $("sidebar-overlay").classList.remove("show"); };
-  }
+  async function renderUtilities(){const rows=await q('utility_readings');rows.sort((a,b)=>new Date(b.reading_date)-new Date(a.reading_date));const units=rows.reduce((s,x)=>s+Number(x.grid_units||0),0),solar=rows.reduce((s,x)=>s+Number(x.solar_units||0),0),bills=rows.reduce((s,x)=>s+Number(x.bill_amount||0),0);$('page-content').innerHTML=pageHead('Operations','Utilities','Electricity tracking with bill amount, grid consumption and solar units.',`<button class="btn btn-vc btn-sm" id="add-utility"><i class="bi bi-plus-lg"></i> Add Reading</button>`)+`<section class="row g-3 mt-1">${metric('Electricity spend',money(bills),'Recorded bills','warning')}${metric('Grid units',units.toLocaleString('en-IN'),'Units consumed','primary')}${metric('Solar units',solar.toLocaleString('en-IN'),'Solar generation','success')}${metric('Net grid units',(units-rows.reduce((s,x)=>s+Number(x.exported_units||0),0)).toLocaleString('en-IN'),'After exports','danger')}</section><div class="table-card mt-3"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Date</th><th>Bill amount</th><th>Grid units</th><th>Solar units</th><th>Exported units</th><th>Notes</th><th></th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td>${fmtDate(x.reading_date)}</td><td>${money2(x.bill_amount)}</td><td>${Number(x.grid_units||0).toLocaleString('en-IN')}</td><td>${Number(x.solar_units||0).toLocaleString('en-IN')}</td><td>${Number(x.exported_units||0).toLocaleString('en-IN')}</td><td>${esc(x.notes||'')}</td><td>${rowActions(x.id,'utility_readings')}</td></tr>`).join(''):`<tr><td colspan="7"><div class="empty-state">No utility readings yet.</div></td></tr>`}</tbody></table></div></div>`;$('add-utility').onclick=openUtilityModal;bindTableActions()}
+  function openUtilityModal(){openModal('Add Electricity Reading',`<form id="utility-form"><div class="row g-3"><div class="col-md-4"><label class="form-label">Reading date</label><input id="utility-date" class="form-control" type="date" value="${todayISO()}"></div><div class="col-md-4"><label class="form-label">Bill amount (₹)</label><input id="utility-bill" class="form-control" type="number" min="0" step="0.01"></div><div class="col-md-4"><label class="form-label">Grid units consumed</label><input id="utility-grid" class="form-control" type="number" min="0" step="0.01"></div><div class="col-md-4"><label class="form-label">Solar units</label><input id="utility-solar" class="form-control" type="number" min="0" step="0.01"></div><div class="col-md-4"><label class="form-label">Exported units</label><input id="utility-export" class="form-control" type="number" min="0" step="0.01"></div><div class="col-12"><label class="form-label">Notes</label><textarea id="utility-notes" class="form-control" placeholder="Meter reading, tariff, remarks..."></textarea></div></div></form>`,async()=>{const p={reading_date:$('utility-date').value,bill_amount:Number($('utility-bill').value||0),grid_units:Number($('utility-grid').value||0),solar_units:Number($('utility-solar').value||0),exported_units:Number($('utility-export').value||0),notes:$('utility-notes').value,created_by:state.user.id};const {error:e}=await state.sb.from('utility_readings').insert(p);if(e)return toast(e.message,'error');closeModal();toast('Utility reading saved.');render()})}
 
-  function bindNavigation() {
-    document.querySelectorAll(".nav-item[data-section]").forEach(btn => {
-      btn.onclick = () => {
-        currentSection = btn.dataset.section;
-        document.querySelectorAll(".nav-item[data-section]").forEach(x => x.classList.toggle("active", x === btn));
-        $("sidebar").classList.remove("open");
-        renderSection();
-      };
-    });
-  }
+  async function renderMaintenance(){const rows=await q('issues');rows.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));const open=rows.filter(x=>x.status!=='completed').length;$('page-content').innerHTML=pageHead('Operations','Maintenance','Track property issues, priorities, due dates and supporting photos.',`<button class="btn btn-vc btn-sm" id="add-maint"><i class="bi bi-plus-lg"></i> New Issue</button>`)+`<section class="row g-3 mt-1">${metric('Open',open,'Active issues','danger')}${metric('In progress',rows.filter(x=>x.status==='in_progress').length,'Being worked on','warning')}${metric('Completed',rows.filter(x=>x.status==='completed').length,'Closed issues','success')}${metric('Urgent',rows.filter(x=>x.priority==='urgent').length,'Priority issues','primary')}</section><div class="table-card mt-3"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Issue</th><th>Category</th><th>Priority</th><th>Status</th><th>Due</th><th>Cost</th><th></th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td><strong>${esc(x.title)}</strong><div class="small text-muted">${esc(x.description||'')}</div></td><td>${esc(x.category||'General')}</td><td><span class="badge ${x.priority==='urgent'?'text-bg-danger':x.priority==='high'?'text-bg-warning':'text-bg-secondary'}">${esc(x.priority||'normal')}</span></td><td>${esc(x.status||'open')}</td><td>${fmtDate(x.due_date)}</td><td>${money2(x.actual_cost||x.estimated_cost||0)}</td><td>${rowActions(x.id,'issues')}</td></tr>`).join(''):`<tr><td colspan="7"><div class="empty-state">No maintenance issues.</div></td></tr>`}</tbody></table></div></div>`;$('add-maint').onclick=openMaintenanceModal;bindTableActions()}
+  function openMaintenanceModal(){openModal('New Maintenance Issue',`<form id="maint-form"><div class="row g-3"><div class="col-md-8"><label class="form-label">Title</label><input id="maint-title" class="form-control" required></div><div class="col-md-4"><label class="form-label">Category</label><input id="maint-category" class="form-control" placeholder="Pool, garden, plumbing..."></div><div class="col-md-4"><label class="form-label">Priority</label><select id="maint-priority" class="form-select"><option>normal</option><option>low</option><option>high</option><option>urgent</option></select></div><div class="col-md-4"><label class="form-label">Status</label><select id="maint-status" class="form-select"><option>open</option><option>in_progress</option><option>waiting</option><option>completed</option></select></div><div class="col-md-4"><label class="form-label">Due date</label><input id="maint-due" class="form-control" type="date"></div><div class="col-md-4"><label class="form-label">Estimated cost</label><input id="maint-est" class="form-control" type="number" min="0" step="0.01"></div><div class="col-md-4"><label class="form-label">Actual cost</label><input id="maint-actual" class="form-control" type="number" min="0" step="0.01"></div><div class="col-12"><label class="form-label">Description</label><textarea id="maint-desc" class="form-control" rows="3"></textarea></div><div class="col-12"><label class="form-label">Notes</label><textarea id="maint-notes" class="form-control"></textarea></div><div class="col-12"><label class="form-label">Photo / document</label><input id="maint-files" class="form-control" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf"></div></div></form>`,async()=>{const p={title:$('maint-title').value,category:$('maint-category').value,priority:$('maint-priority').value,status:$('maint-status').value,due_date:$('maint-due').value||null,estimated_cost:Number($('maint-est').value||0),actual_cost:Number($('maint-actual').value||0),description:$('maint-desc').value,notes:$('maint-notes').value,created_by:state.user.id};const {data,error:e}=await state.sb.from('issues').insert(p).select().single();if(e)return toast(e.message,'error');if($('maint-files').files.length)await uploadAttachments('issues',data.id,$('maint-files').files);closeModal();toast('Maintenance issue created.');render()})}
+  async function uploadAttachments(type,id,files){for(const file of files){const path=`${type}/${id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const {error:e}=await state.sb.storage.from('property-attachments').upload(path,file,{upsert:false});if(e){toast(`Upload failed: ${e.message}`,'error');continue}await state.sb.from('attachments').insert({record_type:type,record_id:id,storage_path:path,original_filename:file.name,mime_type:file.type,file_size:file.size,uploaded_by:state.user.id})}}
+  async function viewRecord(type,id){const {data,error:e}=await state.sb.from(type).select('*').eq('id',id).single();if(e)return toast(e.message,'error');let html='<div class="row g-3">';Object.entries(data).forEach(([k,v])=>{if(['id','created_by','updated_at'].includes(k))return;html+=`<div class="col-md-6"><div class="small text-muted">${esc(k.replaceAll('_',' '))}</div><div class="fw-semibold">${esc(v==null?'—':v)}</div></div>`});html+='</div>';if(type==='issues'){const {data:atts}=await state.sb.from('attachments').select('*').eq('record_type','issues').eq('record_id',id);if(atts?.length){html+='<hr><h5>Photos & documents</h5><div class="row g-3">';for(const a of atts){const {data:s}=await state.sb.storage.from('property-attachments').createSignedUrl(a.storage_path,3600);if(a.mime_type?.startsWith('image/')&&s?.signedUrl)html+=`<div class="col-6 col-md-3"><a href="${s.signedUrl}" target="_blank"><img class="attachment-thumb w-100" src="${s.signedUrl}" alt="${esc(a.original_filename)}"></a><div class="small text-muted mt-1">${esc(a.original_filename)}</div></div>`;else html+=`<div class="col-12"><a target="_blank" href="${s?.signedUrl||'#'}"><i class="bi bi-file-earmark"></i> ${esc(a.original_filename)}</a></div>`}html+='</div>'}}viewModal(type==='issues'?'Maintenance details':'Record details',html)}
 
-  async function enterApp() {
-    authView.classList.add("hidden"); mainView.classList.remove("hidden");
-    try {
-      const { data, error } = await supabase.from("profiles").select("*").eq("id", currentUser.id).single();
-      if (error) throw error;
-      currentProfile = data;
-      if (!currentProfile.active) { await supabase.auth.signOut(); showToast("Your account is disabled. Contact the property administrator.","error"); return; }
-      $("current-user-mini").innerHTML = `<strong>${esc(currentProfile.full_name || currentUser.email)}</strong><br>${esc(ROLE_LABEL[currentProfile.role] || currentProfile.role)}`;
-      $("header-user").textContent = currentUser.email;
-      document.querySelectorAll(".admin-only").forEach(el => el.classList.toggle("hidden", !isAdmin()));
-      if (!isAdmin() && currentSection === "admin") currentSection = "dashboard";
-      renderSection();
-    } catch (e) {
-      showAppError(`Signed in, but the profile could not be loaded. This usually means schema.sql has not been run or the profile record is missing. Details: ${e.message}`);
-    }
-  }
+  async function renderRecurring(){const rows=await q('recurring_tasks');$('page-content').innerHTML=pageHead('Operations','Recurring Maintenance','Keep regular property tasks and next due dates visible.',`<button class="btn btn-vc btn-sm" id="add-recurring"><i class="bi bi-plus-lg"></i> Add Task</button>`)+`<div class="table-card mt-3"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Task</th><th>Frequency</th><th>Next due</th><th>Expected cost</th><th>Last completed</th><th></th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td><strong>${esc(x.task_name)}</strong><div class="small text-muted">${esc(x.category||'')}</div></td><td>${esc(x.frequency||'')}</td><td>${fmtDate(x.next_due)}</td><td>${money2(x.expected_cost)}</td><td>${fmtDate(x.last_completed)}</td><td>${rowActions(x.id,'recurring_tasks')}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-state">No recurring tasks.</div></td></tr>`}</tbody></table></div></div>`;$('add-recurring').onclick=()=>openSimpleRecurring();bindTableActions()}
+  function openSimpleRecurring(){openModal('Add Recurring Task',`<form id="rec-form"><div class="row g-3"><div class="col-md-6"><label class="form-label">Task name</label><input id="rec-name" class="form-control" required></div><div class="col-md-3"><label class="form-label">Frequency</label><select id="rec-frequency" class="form-select"><option>monthly</option><option>weekly</option><option>quarterly</option><option>half_yearly</option><option>yearly</option></select></div><div class="col-md-3"><label class="form-label">Next due</label><input id="rec-due" class="form-control" type="date"></div><div class="col-md-4"><label class="form-label">Category</label><input id="rec-cat" class="form-control"></div><div class="col-md-4"><label class="form-label">Expected cost</label><input id="rec-cost" class="form-control" type="number"></div><div class="col-12"><label class="form-label">Notes</label><textarea id="rec-notes" class="form-control"></textarea></div></div></form>`,async()=>{const p={task_name:$('rec-name').value,frequency:$('rec-frequency').value,next_due:$('rec-due').value||null,category:$('rec-cat').value,expected_cost:Number($('rec-cost').value||0),notes:$('rec-notes').value,created_by:state.user.id};const {error:e}=await state.sb.from('recurring_tasks').insert(p);if(e)return toast(e.message,'error');closeModal();toast('Recurring task added.');render()})}
 
-  function setTitle(title){ $("page-title").textContent = title; }
+  async function renderBills(){const rows=await q('bills');$('page-content').innerHTML=pageHead('Finance','Bills','Track regular bills, expected amounts and due dates.',`<button class="btn btn-vc btn-sm" id="add-bill"><i class="bi bi-plus-lg"></i> Add Bill</button>`)+`<div class="table-card mt-3"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Bill</th><th>Frequency</th><th>Next due</th><th>Expected</th><th>Last paid</th><th>Status</th><th></th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td><strong>${esc(x.bill_name)}</strong><div class="small text-muted">${esc(x.category||'')}</div></td><td>${esc(x.frequency||'')}</td><td>${fmtDate(x.next_due)}</td><td>${money2(x.expected_amount)}</td><td>${fmtDate(x.last_paid)}</td><td>${esc(x.status||'')}</td><td>${rowActions(x.id,'bills')}</td></tr>`).join(''):`<tr><td colspan="7"><div class="empty-state">No bills.</div></td></tr>`}</tbody></table></div></div>`;$('add-bill').onclick=()=>openSimpleBill();bindTableActions()}
+  function openSimpleBill(){openModal('Add Bill',`<form id="bill-form"><div class="row g-3"><div class="col-md-6"><label class="form-label">Bill name</label><input id="bill-name" class="form-control" required></div><div class="col-md-3"><label class="form-label">Frequency</label><select id="bill-frequency" class="form-select"><option>monthly</option><option>quarterly</option><option>yearly</option><option>one_off</option></select></div><div class="col-md-3"><label class="form-label">Next due</label><input id="bill-due" class="form-control" type="date"></div><div class="col-md-4"><label class="form-label">Expected amount</label><input id="bill-amount" class="form-control" type="number"></div><div class="col-md-4"><label class="form-label">Category</label><input id="bill-cat" class="form-control"></div><div class="col-12"><label class="form-label">Notes</label><textarea id="bill-notes" class="form-control"></textarea></div></div></form>`,async()=>{const p={bill_name:$('bill-name').value,frequency:$('bill-frequency').value,next_due:$('bill-due').value||null,expected_amount:Number($('bill-amount').value||0),category:$('bill-cat').value,notes:$('bill-notes').value,status:'active',created_by:state.user.id};const {error:e}=await state.sb.from('bills').insert(p);if(e)return toast(e.message,'error');closeModal();toast('Bill added.');render()})}
 
-  async function renderSection() {
-    clearAppError();
-    if (currentSection === "dashboard") return renderDashboard();
-    if (currentSection === "maintenance") return renderMaintenance();
-    if (currentSection === "recurring") return renderRecurring();
-    if (currentSection === "bills") return renderBills();
-    if (currentSection === "expenses") return renderExpenses();
-    if (currentSection === "admin") return renderAdmin();
-  }
+  async function renderAdmin(){if(!isAdmin())return renderDashboard();const rows=await q('profiles');$('page-content').innerHTML=pageHead('Management','Users & Access','Manage property team profiles and roles.',`<button class="btn btn-vc btn-sm" id="refresh-users"><i class="bi bi-arrow-clockwise"></i> Refresh</button>`)+`<div class="table-card mt-3"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.full_name||'—')}</td><td>${esc(x.email||'—')}</td><td><span class="badge badge-soft">${esc(ROLE_LABEL[x.role]||x.role)}</span></td><td>${x.active?'<span class="badge text-bg-success">Active</span>':'<span class="badge text-bg-secondary">Inactive</span>'}</td><td>${fmtDate(x.created_at)}</td></tr>`).join('')}</tbody></table></div></div><div class="table-card p-3 mt-3"><h2 class="h5">Property settings</h2><p class="text-muted small">These defaults are used when adding income.</p><form id="settings-form" class="row g-3"><div class="col-md-4"><label class="form-label">Management share %</label><input id="setting-mgmt" class="form-control" type="number" step="0.01" value="${state.settings.management_percent}"></div><div class="col-md-4"><label class="form-label">GST %</label><input id="setting-gst" class="form-control" type="number" step="0.01" value="${state.settings.gst_percent}"></div><div class="col-md-4 d-flex align-items-end"><button class="btn btn-vc">Save settings</button></div></form></div>`;$('settings-form').onsubmit=async e=>{e.preventDefault();const p={id:1,management_percent:Number($('setting-mgmt').value),gst_percent:Number($('setting-gst').value),updated_by:state.user.id,updated_at:new Date().toISOString()};const {error:e1}=await state.sb.from('property_settings').upsert(p);if(e1)return toast(e1.message,'error');state.settings={...state.settings,...p};toast('Settings saved.')}}
 
-  function loading(){ pageContent.innerHTML = `<div class="panel"><div class="empty">Loading…</div></div>`; }
+  async function renderCharts(){const [income,expenses]=await Promise.all([q('income'),q('expenses')]);const months=Array.from({length:12},(_,i)=>{const d=new Date(new Date().getFullYear(),i,1);return {key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,label:d.toLocaleDateString('en-GB',{month:'short'})}});const inc=months.map(m=>income.filter(x=>String(x.income_date).slice(0,7)===m.key).reduce((s,x)=>s+Number(x.total_with_gst||0),0));const exp=months.map(m=>expenses.filter(x=>String(x.date).slice(0,7)===m.key).reduce((s,x)=>s+Number(x.amount||0),0));$('page-content').innerHTML=pageHead('Analytics','Financial Analytics','Income and expenses across the current calendar year.')+`<div class="row g-3 mt-1"><div class="col-12"><div class="table-card p-3"><div class="chart-wrap"><canvas id="annualChart"></canvas></div></div></div></div>`;if(window.Chart){state.charts.annual?.destroy();state.charts.annual=new Chart($('annualChart'),{type:'bar',data:{labels:months.map(x=>x.label),datasets:[{label:'Income',data:inc,backgroundColor:'#1f4b3a'},{label:'Expenses',data:exp,backgroundColor:'#a55d43'}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'₹'+Number(v).toLocaleString('en-IN')}}}}})}}
 
-  async function queryTable(table, select="*") {
-    const { data, error } = await supabase.from(table).select(select);
-    if (error) throw error;
-    return data || [];
-  }
-
-  function metricCard(label,value,note=""){
-    return `<div class="card"><div class="metric-label">${esc(label)}</div><div class="metric-value">${esc(value)}</div>${note?`<div class="stat-note">${esc(note)}</div>`:""}</div>`;
-  }
-
-  async function renderDashboard() {
-    setTitle("Dashboard"); loading();
-    try {
-      const [issues, recurring, bills, expenses] = await Promise.all([
-        queryTable("issues","*, issue_assignments(user_id, profiles:profiles!issue_assignments_user_id_fkey(full_name))"),
-        queryTable("recurring_tasks","*"),
-        queryTable("bills","*"),
-        queryTable("expenses","*")
-      ]);
-      const today = new Date(); today.setHours(0,0,0,0);
-      const monthStart = new Date(today.getFullYear(),today.getMonth(),1);
-      const yearStart = new Date(today.getFullYear(),0,1);
-      const open = issues.filter(x=>x.status==="open").length;
-      const progress = issues.filter(x=>x.status==="in_progress").length;
-      const waiting = issues.filter(x=>x.status==="waiting").length;
-      const overdue = issues.filter(x=>x.status!=="completed" && x.due_date && new Date(x.due_date) < today).length;
-      const monthSpend = expenses.filter(x=>new Date(x.date)>=monthStart).reduce((s,x)=>s+Number(x.amount||0),0);
-      const yearSpend = expenses.filter(x=>new Date(x.date)>=yearStart).reduce((s,x)=>s+Number(x.amount||0),0);
-      const monthlyProjection = bills.filter(b=>b.status!=="inactive").reduce((s,b)=>s+Number(b.expected_amount||0)/(b.frequency==="monthly"?1:b.frequency==="quarterly"?3:b.frequency==="yearly"?12:1),0)
-        + recurring.filter(t=>t.next_due).reduce((s,t)=>s+Number(t.expected_cost||0)/(t.frequency==="weekly"?4.33:t.frequency==="twice_monthly"?2:t.frequency==="monthly"?1:t.frequency==="quarterly"?3:t.frequency==="half_yearly"?6:12),0);
-      const yearlyProjection = monthlyProjection*12;
-      const upcoming = [
-        ...issues.filter(x=>x.status!=="completed" && x.due_date).map(x=>({kind:"Maintenance",title:x.title,date:x.due_date,priority:x.priority})),
-        ...recurring.filter(x=>x.next_due).map(x=>({kind:"Recurring",title:x.task_name,date:x.next_due})),
-        ...bills.filter(x=>x.status!=="inactive" && x.next_due).map(x=>({kind:"Bill",title:x.bill_name,date:x.next_due}))
-      ].sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,8);
-      const recent = [
-        ...issues.map(x=>({kind:"Maintenance",title:x.title,date:x.created_at})),
-        ...expenses.map(x=>({kind:"Expense",title:x.description,date:x.created_at})),
-        ...bills.map(x=>({kind:"Bill",title:x.bill_name,date:x.created_at})),
-        ...recurring.filter(x=>x.last_completed).map(x=>({kind:"Completed task",title:x.task_name,date:x.last_completed}))
-      ].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8);
-
-      pageContent.innerHTML = `
-        <div class="cards">
-          ${metricCard("Open maintenance",open)}
-          ${metricCard("In progress",progress)}
-          ${metricCard("Overdue",overdue)}
-          ${metricCard("Waiting",waiting)}
-          ${metricCard("This month",money(monthSpend),"Actual spending")}
-          ${metricCard("This year",money(yearSpend),"Actual spending")}
-          ${metricCard("Monthly projection",money(monthlyProjection),"Recurring bills + tasks")}
-          ${metricCard("Yearly projection",money(yearlyProjection),"Run-rate estimate")}
-        </div>
-        <div class="grid-2">
-          <section class="panel"><h2>Upcoming</h2><div class="list">${upcoming.length ? upcoming.map(x=>`
-            <div class="list-row"><div class="list-main"><div class="list-title">${esc(x.title)}</div><div class="list-meta">${esc(x.kind)}${x.priority?` · ${esc(x.priority)}`:""}</div></div><strong class="${new Date(x.date)<today?"overdue":""}">${dateFmt(x.date)}</strong></div>`).join("") : `<div class="empty">Nothing upcoming.</div>`}</div></section>
-          <section class="panel"><h2>Recent activity</h2><div class="list">${recent.length ? recent.map(x=>`
-            <div class="list-row"><div class="list-main"><div class="list-title">${esc(x.title)}</div><div class="list-meta">${esc(x.kind)}</div></div><span>${dateFmt(x.date)}</span></div>`).join("") : `<div class="empty">No recent activity.</div>`}</div></section>
-        </div>
-      `;
-    } catch(e) { handleError(e,"Dashboard could not load."); }
-  }
-
-  function toolbar({searchId, addText, addFn, filters=""}={}) {
-    return `<div class="section-toolbar"><div class="toolbar-left">${searchId?`<input class="search" id="${searchId}" placeholder="Search…">`:""}${filters}</div><div class="toolbar-right">${addText?`<button class="btn btn-primary" id="add-record-btn">+ ${esc(addText)}</button>`:""}</div></div>`;
-  }
-
-  function issueBadge(v){ return `<span class="badge badge-${v==="in_progress"?"progress":v==="completed"?"complete":v==="waiting"?"waiting":"open"}">${esc(v.replace("_"," "))}</span>`; }
-  function priorityBadge(v){ return `<span class="badge badge-${v}">${esc(v)}</span>`; }
-
-  async function renderMaintenance() {
-    setTitle("Maintenance"); loading();
-    try {
-      currentRecords = await queryTable("issues","*, issue_assignments(user_id, profiles:profiles!issue_assignments_user_id_fkey(full_name))");
-      pageContent.innerHTML = `
-        ${toolbar({searchId:"issue-search",addText:canEditRecord("issues")?"Report issue":""})}
-        <div class="desktop-table table-wrap"><table class="data-table"><thead><tr><th>Issue</th><th>Category</th><th>Priority</th><th>Status</th><th>Due</th><th>Assigned</th><th></th></tr></thead><tbody id="issue-table"></tbody></table></div>
-        <div class="mobile-cards" id="issue-mobile"></div>`;
-      if ($("add-record-btn")) $("add-record-btn").onclick = () => openIssueModal();
-      renderIssueRows(currentRecords);
-      $("issue-search").oninput = () => renderIssueRows(filterText(currentRecords,$("issue-search").value,["title","description","category","status","priority"]));
-    } catch(e) { handleError(e,"Maintenance could not load."); }
-  }
-
-  function filterText(rows,q,fields){ if(!q)return rows; q=q.toLowerCase(); return rows.filter(r=>fields.some(f=>String(r[f]??"").toLowerCase().includes(q))); }
-
-  function assignees(record){
-    return (record.issue_assignments||[]).map(a=>a.profiles?.full_name).filter(Boolean).join(", ") || "Unassigned";
-  }
-
-  function renderIssueRows(rows){
-    $("issue-table").innerHTML = rows.length ? rows.map(r=>`
-      <tr class="clickable" data-id="${r.id}">
-        <td><strong>${esc(r.title)}</strong><div class="list-meta">${esc(r.description||"").slice(0,70)}</div></td>
-        <td>${esc(r.category)}</td><td>${priorityBadge(r.priority)}</td><td>${issueBadge(r.status)}</td>
-        <td class="${r.status!=="completed"&&r.due_date&&new Date(r.due_date)<new Date()?"overdue":""}">${dateFmt(r.due_date)}</td>
-        <td>${esc(assignees(r))}</td><td><button class="icon-btn more" data-id="${r.id}" aria-label="Actions">•••</button></td>
-      </tr>`).join("") : `<tr><td colspan="7"><div class="empty">No maintenance issues found.</div></td></tr>`;
-    $("issue-mobile").innerHTML = rows.length ? rows.map(r=>`
-      <article class="mobile-record clickable" data-id="${r.id}">
-        <div class="mobile-record-head"><div class="mobile-record-title">${esc(r.title)}</div>${priorityBadge(r.priority)}</div>
-        <div class="list-meta">${esc(r.category)} · ${issueBadge(r.status)}</div>
-        <div class="mobile-record-grid"><div><div class="mobile-record-label">Due</div><div class="mobile-record-value">${dateFmt(r.due_date)}</div></div><div><div class="mobile-record-label">Assigned</div><div class="mobile-record-value">${esc(assignees(r))}</div></div></div>
-      </article>`).join("") : `<div class="empty">No maintenance issues found.</div>`;
-    document.querySelectorAll("[data-id]").forEach(el=>{ if(el.dataset.id && !el.classList.contains("more")) el.onclick=()=>openIssueModal(el.dataset.id); });
-    document.querySelectorAll(".more").forEach(el=>el.onclick=e=>{e.stopPropagation(); openActions("issues",el.dataset.id);});
-  }
-
-  async function renderRecurring(){
-    setTitle("Recurring"); loading();
-    try {
-      currentRecords=await queryTable("recurring_tasks","*");
-      pageContent.innerHTML=`${toolbar({searchId:"recurring-search",addText:canEditRecord("recurring_tasks")?"Add recurring task":""})}
-      <div class="desktop-table table-wrap"><table class="data-table"><thead><tr><th>Task</th><th>Category</th><th>Frequency</th><th>Next due</th><th>Expected</th><th>Last completed</th><th></th></tr></thead><tbody id="recurring-table"></tbody></table></div><div class="mobile-cards" id="recurring-mobile"></div>`;
-      if($("add-record-btn")) $("add-record-btn").onclick=()=>openRecurringModal();
-      renderRecurringRows(currentRecords);
-      $("recurring-search").oninput=()=>renderRecurringRows(filterText(currentRecords,$("recurring-search").value,["task_name","description","category","frequency"]));
-    }catch(e){handleError(e,"Recurring tasks could not load.");}
-  }
-  function renderRecurringRows(rows){
-    const freq = v=>v?.replace("_"," ");
-    $("recurring-table").innerHTML=rows.length?rows.map(r=>`<tr class="clickable" data-rid="${r.id}"><td><strong>${esc(r.task_name)}</strong><div class="list-meta">${esc(r.description||"").slice(0,70)}</div></td><td>${esc(r.category)}</td><td>${esc(freq(r.frequency))}</td><td>${dateFmt(r.next_due)}</td><td>${money(r.expected_cost)}</td><td>${dateFmt(r.last_completed)}</td><td><button class="icon-btn recurring-more" data-id="${r.id}">•••</button></td></tr>`).join(""):`<tr><td colspan="7"><div class="empty">No recurring tasks found.</div></td></tr>`;
-    $("recurring-mobile").innerHTML=rows.length?rows.map(r=>`<article class="mobile-record clickable" data-rid="${r.id}"><div class="mobile-record-head"><div class="mobile-record-title">${esc(r.task_name)}</div><span class="badge badge-normal">${esc(freq(r.frequency))}</span></div><div class="mobile-record-grid"><div><div class="mobile-record-label">Next due</div><div class="mobile-record-value">${dateFmt(r.next_due)}</div></div><div><div class="mobile-record-label">Expected</div><div class="mobile-record-value">${money(r.expected_cost)}</div></div></div></article>`).join(""):`<div class="empty">No recurring tasks found.</div>`;
-    document.querySelectorAll("[data-rid]").forEach(el=>el.onclick=()=>openRecurringModal(el.dataset.rid));
-    document.querySelectorAll(".recurring-more").forEach(el=>el.onclick=e=>{e.stopPropagation();openActions("recurring_tasks",el.dataset.id);});
-  }
-
-  async function renderBills(){
-    setTitle("Bills"); loading();
-    try{
-      currentRecords=await queryTable("bills","*");
-      pageContent.innerHTML=`${toolbar({searchId:"bill-search",addText:canFinance()?"Add bill":""})}
-      <div class="desktop-table table-wrap"><table class="data-table"><thead><tr><th>Bill</th><th>Category</th><th>Frequency</th><th>Expected</th><th>Next due</th><th>Status</th><th></th></tr></thead><tbody id="bill-table"></tbody></table></div><div class="mobile-cards" id="bill-mobile"></div>`;
-      if($("add-record-btn"))$("add-record-btn").onclick=()=>openBillModal();
-      renderBillRows(currentRecords); $("bill-search").oninput=()=>renderBillRows(filterText(currentRecords,$("bill-search").value,["bill_name","category","frequency","status"]));
-    }catch(e){handleError(e,"Bills could not load.");}
-  }
-  function renderBillRows(rows){
-    $("bill-table").innerHTML=rows.length?rows.map(r=>`<tr class="clickable" data-bid="${r.id}"><td><strong>${esc(r.bill_name)}</strong></td><td>${esc(r.category)}</td><td>${esc(r.frequency)}</td><td>${money(r.expected_amount)}</td><td>${dateFmt(r.next_due)}</td><td><span class="badge ${r.status==="inactive"?"badge-disabled":"badge-active"}">${esc(r.status)}</span></td><td><button class="icon-btn bill-more" data-id="${r.id}">•••</button></td></tr>`).join(""):`<tr><td colspan="7"><div class="empty">No bills found.</div></td></tr>`;
-    $("bill-mobile").innerHTML=rows.length?rows.map(r=>`<article class="mobile-record clickable" data-bid="${r.id}"><div class="mobile-record-head"><div class="mobile-record-title">${esc(r.bill_name)}</div><span class="badge ${r.status==="inactive"?"badge-disabled":"badge-active"}">${esc(r.status)}</span></div><div class="mobile-record-grid"><div><div class="mobile-record-label">Next due</div><div class="mobile-record-value">${dateFmt(r.next_due)}</div></div><div><div class="mobile-record-label">Expected</div><div class="mobile-record-value">${money(r.expected_amount)}</div></div></div></article>`).join(""):`<div class="empty">No bills found.</div>`;
-    document.querySelectorAll("[data-bid]").forEach(el=>el.onclick=()=>openBillModal(el.dataset.bid));
-    document.querySelectorAll(".bill-more").forEach(el=>el.onclick=e=>{e.stopPropagation();openActions("bills",el.dataset.id);});
-  }
-
-  async function renderExpenses(){
-    setTitle("Expenses"); loading();
-    try{
-      currentRecords=await queryTable("expenses","*");
-      pageContent.innerHTML=`${toolbar({searchId:"expense-search",addText:canFinance()?"Add expense":""})}
-      <div class="desktop-table table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Source</th><th></th></tr></thead><tbody id="expense-table"></tbody></table></div><div class="mobile-cards" id="expense-mobile"></div>`;
-      if($("add-record-btn"))$("add-record-btn").onclick=()=>openExpenseModal();
-      renderExpenseRows(currentRecords); $("expense-search").oninput=()=>renderExpenseRows(filterText(currentRecords,$("expense-search").value,["description","category","source_type"]));
-    }catch(e){handleError(e,"Expenses could not load.");}
-  }
-  function renderExpenseRows(rows){
-    $("expense-table").innerHTML=rows.length?rows.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(r=>`<tr class="clickable" data-eid="${r.id}"><td>${dateFmt(r.date)}</td><td><strong>${esc(r.description)}</strong></td><td>${esc(r.category)}</td><td><strong>${money(r.amount)}</strong></td><td>${esc(r.source_type||"manual")}</td><td><button class="icon-btn expense-more" data-id="${r.id}">•••</button></td></tr>`).join(""):`<tr><td colspan="6"><div class="empty">No expenses found.</div></td></tr>`;
-    $("expense-mobile").innerHTML=rows.length?rows.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(r=>`<article class="mobile-record clickable" data-eid="${r.id}"><div class="mobile-record-head"><div class="mobile-record-title">${esc(r.description)}</div><strong>${money(r.amount)}</strong></div><div class="list-meta">${dateFmt(r.date)} · ${esc(r.category)}</div></article>`).join(""):`<div class="empty">No expenses found.</div>`;
-    document.querySelectorAll("[data-eid]").forEach(el=>el.onclick=()=>openExpenseModal(el.dataset.eid));
-    document.querySelectorAll(".expense-more").forEach(el=>el.onclick=e=>{e.stopPropagation();openActions("expenses",el.dataset.id);});
-  }
-
-  async function renderAdmin(){
-    if(!isAdmin())return;
-    setTitle("Admin"); loading();
-    try{
-      const profiles=await queryTable("profiles","*");
-      pageContent.innerHTML=`<section class="panel"><div class="section-toolbar"><div><h2>User access</h2><div class="calendar-note">Create/invite users from Supabase Authentication → Users. Change their application role and disable access here.</div></div></div>
-      <div class="desktop-table table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead><tbody>${profiles.map(p=>`<tr><td><strong>${esc(p.full_name||"—")}</strong></td><td>${esc(p.email||"—")}</td><td><select class="role-select" data-id="${p.id}" ${p.id===currentUser.id?"":" "}>${Object.entries(ROLE_LABEL).map(([v,l])=>`<option value="${v}" ${p.role===v?"selected":""}>${l}</option>`).join("")}</select></td><td><span class="badge ${p.active?"badge-active":"badge-disabled"}">${p.active?"Active":"Disabled"}</span></td><td>${dateFmt(p.created_at)}</td><td>${p.id!==currentUser.id?`<button class="btn btn-ghost toggle-user" data-id="${p.id}" data-active="${p.active}">${p.active?"Disable":"Enable"}</button>`:"Current user"}</td></tr>`).join("")}</tbody></table></div></section>`;
-      document.querySelectorAll(".role-select").forEach(el=>el.onchange=async()=>{const {error}=await supabase.from("profiles").update({role:el.value,updated_at:nowISO()}).eq("id",el.dataset.id); if(error){showToast(`Role update failed: ${error.message}`,"error");return;} showToast("Role updated.");});
-      document.querySelectorAll(".toggle-user").forEach(el=>el.onclick=async()=>{const active=el.dataset.active==="true"; const ok=await confirmDelete(`This will ${active?"disable":"enable"} this user's application access.`,"CONFIRM"); if(!ok)return; const {error}=await supabase.from("profiles").update({active:!active,updated_at:nowISO()}).eq("id",el.dataset.id); if(error){showToast(`Could not update user: ${error.message}`,"error");return;} renderAdmin();});
-    }catch(e){handleError(e,"Admin could not load.");}
-  }
-
-  function openActions(type,id){
-    const record=currentRecords.find(x=>x.id===id);
-    if(!record)return;
-    const actions=[];
-    if(canEditRecord(type)) actions.push(`<button class="btn btn-secondary" id="action-edit">Edit</button>`);
-    if(type==="issues") actions.push(`<button class="btn btn-secondary" id="action-photos"><i class="ti ti-photo"></i> Photos & documents</button>`);    if(type==="bills" && canFinance() && record.status!=="inactive") actions.push(`<button class="btn btn-primary" id="action-pay">Pay Bill</button>`);
-    if(type==="recurring_tasks" && canEditRecord(type)) actions.push(`<button class="btn btn-primary" id="action-complete">Complete</button>`);
-    if(canDelete()) actions.push(`<button class="btn btn-danger" id="action-delete">Delete</button>`);
-    openModal("Actions",`<div class="list">${actions.length?actions.join(""):`<div class="empty">No actions available for your role.</div>`}</div>`);
-    if($("action-edit")) $("action-edit").onclick=()=>{closeModal(); type==="issues"?openIssueModal(id):type==="recurring_tasks"?openRecurringModal(id):type==="bills"?openBillModal(id):openExpenseModal(id);};
-    if($("action-delete")) $("action-delete").onclick=async()=>{closeModal();if(await confirmDelete(`Delete this ${type.replace("_"," ")} permanently?`,"DELETE"))await deleteRecord(type,id);};
-    if($("action-photos")) $("action-photos").onclick=()=>{closeModal();openAttachmentList("issue",id);};    if($("action-pay")) $("action-pay").onclick=()=>{closeModal();openPayBillModal(record);};
-    if($("action-complete")) $("action-complete").onclick=()=>{closeModal();openCompleteRecurringModal(record);};
-  }
-
-  async function deleteRecord(type,id){
-    const {error}=await supabase.from(type).delete().eq("id",id);
-    if(error){showToast(`Delete failed: ${error.message}`,"error");return;}
-    showToast("Deleted."); renderSection();
-  }
-
-  function confirmDelete(message,word="DELETE"){
-    return new Promise(resolve=>{
-      openModal("Confirm deletion",`<div class="danger-box">${esc(message)}<br><br>Type <strong>${esc(word)}</strong> to continue.</div><div class="field" style="margin-top:14px"><label>Confirmation<input id="delete-word" autocomplete="off"></label></div><div class="modal-actions"><button class="btn btn-ghost" id="cancel-delete">Cancel</button><button class="btn btn-danger" id="confirm-delete">Confirm</button></div>`);
-      $("cancel-delete").onclick=()=>{closeModal();resolve(false);};
-      $("confirm-delete").onclick=()=>{const ok=$("delete-word").value===word; if(!ok)return showToast(`Please type ${word} exactly.`,"error"); closeModal();resolve(true);};
-    });
-  }
-
-  async function openIssueModal(id=null){
-    let r=id?currentRecords.find(x=>x.id===id):null;
-    const users = await queryTable("profiles","id,full_name,role,active");
-    const assigned = new Set((r?.issue_assignments||[]).map(x=>x.user_id));
-    openModal(r?"Edit maintenance":"Report maintenance",`
-      <form id="record-form" class="modal-form">
-        <div class="form-columns">
-          <div class="field"><label>Title<input id="f-title" required value="${esc(r?.title)}"></label></div>
-          <div class="field"><label>Category<select id="f-category">${["Pool","Garden","Electrical","Plumbing","Air Conditioning","Building","Security","Cleaning","Furniture","Appliances","Other"].map(x=>`<option ${r?.category===x?"selected":""}>${x}</option>`).join("")}</select></label></div>
-          <div class="field"><label>Priority<select id="f-priority">${["urgent","high","normal","low"].map(x=>`<option ${r?.priority===x?"selected":""}>${x}</option>`).join("")}</select></label></div>
-          <div class="field"><label>Status<select id="f-status">${["open","in_progress","waiting","completed"].map(x=>`<option ${r?.status===x?"selected":""}>${x.replace("_"," ")}</option>`).join("")}</select></label></div>
-          <div class="field"><label>Due date<input id="f-due" type="date" min="${new Date().toISOString().slice(0,10)}" value="${r?.due_date?String(r.due_date).slice(0,10):""}"></label></div>
-          <div class="field"><label>Estimated cost<input id="f-estimate" type="number" min="0" step="0.01" value="${r?.estimated_cost??""}"></label></div>
-          <div class="field"><label>Actual cost<input id="f-actual" type="number" min="0" step="0.01" value="${r?.actual_cost??""}"></label></div>
-          <div class="field"><label>Assigned people<select id="f-assigned" multiple size="4">${users.filter(u=>u.active).map(u=>`<option value="${u.id}" ${assigned.has(u.id)?"selected":""}>${esc(u.full_name||u.id)} — ${esc(ROLE_LABEL[u.role]||u.role)}</option>`).join("")}</select></label></div>
-          <div class="field full"><label>Description<textarea id="f-description">${esc(r?.description)}</textarea></label></div>
-          <div class="field full"><label>Notes<textarea id="f-notes">${esc(r?.notes)}</textarea></label></div>
-          <div class="field full"><label>Photos / documents<input id="f-files" class="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple><span class="calendar-note">JPG, JPEG, PNG, WEBP or PDF. Maximum 10 MB per file.</span></label>${id?`<button type="button" class="btn btn-secondary" id="view-attachments-btn"><i class="ti ti-photo"></i> View uploaded photos & documents</button>`:""}</div>
-        </div>
-        <div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary" type="submit">Save</button></div>
-      </form>`);
-    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
-    $("record-form").onsubmit=async e=>{
-      e.preventDefault();
-      const due=$("f-due").value;
-      if(due && due < new Date().toISOString().slice(0,10) && !r) return showToast("Due date cannot be in the past.","error");
-      const payload={title:$("f-title").value.trim(),description:$("f-description").value.trim(),category:$("f-category").value,priority:$("f-priority").value,status:$("f-status").value,due_date:due||null,estimated_cost:numOrNull($("f-estimate").value),actual_cost:numOrNull($("f-actual").value),notes:$("f-notes").value.trim(),updated_at:nowISO()};
-      if(!payload.title)return showToast("Title is required.","error");
-      let issueId=id;
-      if(id){const {error}=await supabase.from("issues").update(payload).eq("id",id);if(error)return showToast(`Save failed: ${error.message}`,"error");}
-      else{payload.created_by=currentUser.id;const {data,error}=await supabase.from("issues").insert(payload).select("id").single();if(error)return showToast(`Create failed: ${error.message}`,"error");issueId=data.id;}
-      const selected=[...$("f-assigned").selectedOptions].map(o=>o.value);
-      if(id) await supabase.from("issue_assignments").delete().eq("issue_id",issueId);
-      if(selected.length){const {error}=await supabase.from("issue_assignments").insert(selected.map(user_id=>({issue_id:issueId,user_id})));if(error)return showToast(`Assignment failed: ${error.message}`,"error");}
-      await uploadFiles("issue",issueId,$("f-files").files);
-      closeModal();showToast(id?"Maintenance updated.":"Maintenance created.");renderMaintenance();
-    };
-  }
-
-  function numOrNull(v){return v===""?null:Number(v)}
-
-  async function openRecurringModal(id=null){
-    const r=id?currentRecords.find(x=>x.id===id):null;
-    openModal(r?"Edit recurring task":"Add recurring task",`
-      <form id="record-form" class="modal-form"><div class="form-columns">
-      <div class="field"><label>Task name<input id="f-name" required value="${esc(r?.task_name)}"></label></div>
-      <div class="field"><label>Category<select id="f-category">${["Pool","Garden","Electrical","Plumbing","Air Conditioning","Building","Security","Cleaning","Furniture","Appliances","Other"].map(x=>`<option ${r?.category===x?"selected":""}>${x}</option>`).join("")}</select></label></div>
-      <div class="field"><label>Frequency<select id="f-frequency">${["weekly","twice_monthly","monthly","quarterly","half_yearly","yearly"].map(x=>`<option ${r?.frequency===x?"selected":""}>${x.replace("_"," ")}</option>`).join("")}</select></label></div>
-      <div class="field"><label>Next due<input id="f-next" type="date" value="${r?.next_due?String(r.next_due).slice(0,10):""}"></label></div>
-      <div class="field"><label>Expected cost<input id="f-cost" type="number" min="0" step="0.01" value="${r?.expected_cost??""}"></label></div>
-      <div class="field"><label>Last actual cost<input id="f-lastcost" type="number" min="0" step="0.01" value="${r?.last_actual_cost??""}"></label></div>
-      <div class="field full"><label>Description<textarea id="f-description">${esc(r?.description)}</textarea></label></div>
-      <div class="field full"><label>Notes<textarea id="f-notes">${esc(r?.notes)}</textarea></label></div>
-      <div class="field full"><label>Photos / documents<input id="f-files" class="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple></label></div>
-      </div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Save</button></div></form>`);
-    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
-    $("record-form").onsubmit=async e=>{e.preventDefault();const payload={task_name:$("f-name").value.trim(),category:$("f-category").value,frequency:$("f-frequency").value,next_due:$("f-next").value||null,expected_cost:numOrNull($("f-cost").value),last_actual_cost:numOrNull($("f-lastcost").value),description:$("f-description").value.trim(),notes:$("f-notes").value.trim(),updated_at:nowISO()};if(!payload.task_name)return showToast("Task name is required.","error");let taskId=id;if(id){const {error}=await supabase.from("recurring_tasks").update(payload).eq("id",id);if(error)return showToast(`Save failed: ${error.message}`,"error");}else{payload.created_by=currentUser.id;const {data,error}=await supabase.from("recurring_tasks").insert(payload).select("id").single();if(error)return showToast(`Create failed: ${error.message}`,"error");taskId=data.id;}await uploadFiles("recurring_task",taskId,$("f-files").files);closeModal();showToast(id?"Recurring task updated.":"Recurring task created.");renderRecurring();};
-  }
-
-  async function openCompleteRecurringModal(r){
-    openModal("Complete recurring task",`<form id="complete-form" class="modal-form"><div class="notice">Completion will record today's date, store the actual cost, calculate the next due date, and create an expense automatically.</div><div class="form-columns"><div class="field"><label>Actual cost<input id="complete-cost" type="number" min="0" step="0.01" value="${r.expected_cost??""}"></label></div><div class="field"><label>Completion date<input id="complete-date" type="date" value="${new Date().toISOString().slice(0,10)}"></label></div></div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Complete</button></div></form>`);
-    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
-    $("complete-form").onsubmit=async e=>{e.preventDefault();const date=$("complete-date").value,cost=Number($("complete-cost").value||0);const next=nextDue(date,r.frequency);const {error}=await supabase.from("recurring_tasks").update({last_completed:date,last_actual_cost:cost,next_due:next,updated_at:nowISO()}).eq("id",r.id);if(error)return showToast(`Completion failed: ${error.message}`,"error");const {error:ee}=await supabase.from("expenses").insert({date,description:`${r.task_name} — recurring task`,category:r.category,amount:cost,source_type:"recurring_task",source_id:r.id,created_by:currentUser.id,notes:"Automatically created when recurring task was completed."});if(ee)return showToast(`Task completed, but expense creation failed: ${ee.message}`,"error");closeModal();showToast("Task completed and expense created.");renderRecurring();};
-  }
-
-  function nextDue(date,freq){const d=new Date(date+"T12:00:00");if(freq==="weekly")d.setDate(d.getDate()+7);else if(freq==="twice_monthly")d.setDate(d.getDate()+15);else if(freq==="monthly")d.setMonth(d.getMonth()+1);else if(freq==="quarterly")d.setMonth(d.getMonth()+3);else if(freq==="half_yearly")d.setMonth(d.getMonth()+6);else d.setFullYear(d.getFullYear()+1);return d.toISOString().slice(0,10)}
-
-  async function openBillModal(id=null){
-    const r=id?currentRecords.find(x=>x.id===id):null;
-    openModal(r?"Edit bill":"Add bill",`<form id="record-form" class="modal-form"><div class="form-columns">
-      <div class="field"><label>Bill name<input id="f-name" required value="${esc(r?.bill_name)}"></label></div>
-      <div class="field"><label>Category<select id="f-category">${["Electricity","Water","Property tax","Insurance","Internet","Gas","Waste","Other"].map(x=>`<option ${r?.category===x?"selected":""}>${x}</option>`).join("")}</select></label></div>
-      <div class="field"><label>Frequency<select id="f-frequency">${["monthly","quarterly","yearly","other"].map(x=>`<option ${r?.frequency===x?"selected":""}>${x}</option>`).join("")}</select></label></div>
-      <div class="field"><label>Expected amount<input id="f-amount" type="number" min="0" step="0.01" value="${r?.expected_amount??""}"></label></div>
-      <div class="field"><label>Next due<input id="f-next" type="date" min="${new Date().toISOString().slice(0,10)}" value="${r?.next_due?String(r.next_due).slice(0,10):""}"></label></div>
-      <div class="field"><label>Status<select id="f-status"><option ${r?.status!=="inactive"?"selected":""}>active</option><option ${r?.status==="inactive"?"selected":""}>inactive</option></select></label></div>
-      <div class="field full"><label>Notes<textarea id="f-notes">${esc(r?.notes)}</textarea></label></div>
-      <div class="field full"><label>Bill documents<input id="f-files" class="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple></label></div>
-      </div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Save</button></div></form>`);
-    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
-    $("record-form").onsubmit=async e=>{e.preventDefault();const due=$("f-next").value;if(due && due<new Date().toISOString().slice(0,10) && !r)return showToast("Next due date cannot be in the past.","error");const payload={bill_name:$("f-name").value.trim(),category:$("f-category").value,frequency:$("f-frequency").value,expected_amount:numOrNull($("f-amount").value),next_due:due||null,status:$("f-status").value,notes:$("f-notes").value.trim(),updated_at:nowISO()};if(!payload.bill_name)return showToast("Bill name is required.","error");let billId=id;if(id){const {error}=await supabase.from("bills").update(payload).eq("id",id);if(error)return showToast(`Save failed: ${error.message}`,"error");}else{payload.created_by=currentUser.id;const {data,error}=await supabase.from("bills").insert(payload).select("id").single();if(error)return showToast(`Create failed: ${error.message}`,"error");billId=data.id;}await uploadFiles("bill",billId,$("f-files").files);closeModal();showToast(id?"Bill updated.":"Bill created.");renderBills();};
-  }
-
-  function openPayBillModal(r){
-    openModal("Pay bill",`<form id="pay-form" class="modal-form"><div class="notice">Paying this bill creates an expense and advances the next due date according to its frequency.</div><div class="form-columns"><div class="field"><label>Actual amount paid<input id="pay-amount" type="number" min="0" step="0.01" value="${r.expected_amount??""}" required></label></div><div class="field"><label>Payment date<input id="pay-date" type="date" value="${new Date().toISOString().slice(0,10)}" required></label></div></div><div class="field"><label>Notes<textarea id="pay-notes"></textarea></label></div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Pay Bill</button></div></form>`);
-    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
-    $("pay-form").onsubmit=async e=>{e.preventDefault();const date=$("pay-date").value,amount=Number($("pay-amount").value);const next=nextBillDue(date,r.frequency);const {error}=await supabase.from("bills").update({last_paid:date,last_paid_amount:amount,next_due:next,updated_at:nowISO()}).eq("id",r.id);if(error)return showToast(`Payment update failed: ${error.message}`,"error");const {error:ee}=await supabase.from("expenses").insert({date,description:`${r.bill_name} — bill`,category:r.category,amount,source_type:"bill",source_id:r.id,created_by:currentUser.id,notes:$("pay-notes").value.trim()});if(ee)return showToast(`Bill updated, but expense creation failed: ${ee.message}`,"error");closeModal();showToast("Bill paid and expense recorded.");renderBills();};
-  }
-  function nextBillDue(date,freq){const d=new Date(date+"T12:00:00");if(freq==="monthly")d.setMonth(d.getMonth()+1);else if(freq==="quarterly")d.setMonth(d.getMonth()+3);else if(freq==="yearly")d.setFullYear(d.getFullYear()+1);else d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10)}
-
-  async function openExpenseModal(id=null){
-    const r=id?currentRecords.find(x=>x.id===id):null;
-    openModal(r?"Edit expense":"Add expense",`<form id="record-form" class="modal-form"><div class="form-columns">
-      <div class="field"><label>Date<input id="f-date" type="date" required value="${r?.date?String(r.date).slice(0,10):new Date().toISOString().slice(0,10)}"></label></div>
-      <div class="field"><label>Amount<input id="f-amount" type="number" min="0" step="0.01" required value="${r?.amount??""}"></label></div>
-      <div class="field"><label>Description<input id="f-description" required value="${esc(r?.description)}"></label></div>
-      <div class="field"><label>Category<input id="f-category" value="${esc(r?.category)}"></label></div>
-      <div class="field"><label>Source<select id="f-source"><option value="manual">manual</option><option value="maintenance">maintenance</option><option value="recurring_task">recurring task</option><option value="bill">bill</option></select></label></div>
-      <div class="field full"><label>Notes<textarea id="f-notes">${esc(r?.notes)}</textarea></label></div>
-      <div class="field full"><label>Receipt / document<input id="f-files" class="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple></label></div>
-      </div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="cancel-form">Cancel</button><button class="btn btn-primary">Save</button></div></form>`);
-    if(r)$("f-source").value=r.source_type||"manual";
-    $("cancel-form").onclick=closeModal;    if($("view-attachments-btn")) $("view-attachments-btn").onclick=()=>openAttachmentList("issue",id);
-    $("record-form").onsubmit=async e=>{e.preventDefault();const payload={date:$("f-date").value,amount:Number($("f-amount").value),description:$("f-description").value.trim(),category:$("f-category").value.trim()||"Other",source_type:$("f-source").value,notes:$("f-notes").value.trim(),updated_at:nowISO()};if(!payload.description||!payload.amount)return showToast("Description and amount are required.","error");let expenseId=id;if(id){const {error}=await supabase.from("expenses").update(payload).eq("id",id);if(error)return showToast(`Save failed: ${error.message}`,"error");}else{payload.created_by=currentUser.id;const {data,error}=await supabase.from("expenses").insert(payload).select("id").single();if(error)return showToast(`Create failed: ${error.message}`,"error");expenseId=data.id;}await uploadFiles("expense",expenseId,$("f-files").files);closeModal();showToast(id?"Expense updated.":"Expense created.");renderExpenses();};
-  }
-
-  async function uploadFiles(recordType,recordId,fileList){
-    const files=[...(fileList||[])];
-    for(const file of files){
-      if(file.size>10*1024*1024){showToast(`${file.name} is larger than 10 MB and was skipped.`,"error");continue;}
-      const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
-      const path=`${currentUser.id}/${recordType}/${recordId}/${crypto.randomUUID()}-${safe}`;
-      const {error}=await supabase.storage.from("property-attachments").upload(path,file,{upsert:false});
-      if(error){showToast(`Unable to upload ${file.name}: ${error.message}`,"error");continue;}
-      const {error:dbError}=await supabase.from("attachments").insert({record_type:recordType,record_id:recordId,storage_path:path,original_filename:file.name,mime_type:file.type||"application/octet-stream",file_size:file.size,uploaded_by:currentUser.id});
-      if(dbError){showToast(`File uploaded but metadata save failed for ${file.name}: ${dbError.message}`,"error");}
-    }
-  }
-
-  async function openAttachmentList(type,id){
-    const {data,error}=await supabase.from("attachments").select("*").eq("record_type",type).eq("record_id",id).order("created_at",{ascending:false});
-    if(error)return showToast(`Attachments could not load: ${error.message}`,"error");
-    if(!data.length){openModal("Photos & documents",`<div class="empty">No photos or documents have been uploaded for this record.</div>`);return;}
-
-    const cards=[];
-    for(const a of data){
-      const {data:urlData,error:urlError}=await supabase.storage.from("property-attachments").createSignedUrl(a.storage_path,3600);
-      if(urlError || !urlData?.signedUrl){
-        cards.push(`<div class="attachment-card"><div class="attachment-file"><i class="ti ti-file-off"></i><span>Preview unavailable</span></div><div class="attachment-meta"><strong>${esc(a.original_filename)}</strong></div></div>`);
-        continue;
-      }
-      const url=urlData.signedUrl;
-      const isImage=(a.mime_type||"").startsWith("image/");
-      cards.push(isImage
-        ? `<div class="attachment-card"><img class="attachment-thumb" src="${esc(url)}" alt="${esc(a.original_filename)}" data-image-url="${esc(url)}" data-image-name="${esc(a.original_filename)}"><div class="attachment-meta"><strong title="${esc(a.original_filename)}">${esc(a.original_filename)}</strong><a href="${esc(url)}" target="_blank" rel="noopener">Open</a></div></div>`
-        : `<div class="attachment-card"><div class="attachment-file"><i class="ti ti-file-type-pdf"></i><strong>PDF document</strong><a href="${esc(url)}" target="_blank" rel="noopener">Open document</a></div><div class="attachment-meta"><strong title="${esc(a.original_filename)}">${esc(a.original_filename)}</strong></div></div>`
-      );
-    }
-    openModal("Photos & documents",`<div class="attachments">${cards.join("")}</div>`);
-    document.querySelectorAll(".attachment-thumb").forEach(img=>{
-      img.onclick=()=>openImagePreview(img.dataset.imageUrl,img.dataset.imageName);
-    });
-  }
-
-  function openImagePreview(url,name){
-    openModal(name || "Photo",`<div style="padding:14px"><img src="${esc(url)}" alt="${esc(name||"Attachment")}" style="display:block;width:100%;max-height:72vh;object-fit:contain;border-radius:8px;background:#f4f4f4"></div>`);
-  }
-
-  function openModal(title,body){
-    modalRoot.innerHTML=`<div class="modal-backdrop" id="modal-backdrop"><div class="modal"><div class="modal-header"><h2>${esc(title)}</h2><button class="icon-btn" id="modal-close" aria-label="Close">×</button></div>${body}</div></div>`;
-    $("modal-close").onclick=closeModal;
-    $("modal-backdrop").onclick=e=>{if(e.target.id==="modal-backdrop")closeModal()};
-  }
-  function closeModal(){modalRoot.innerHTML=""}
-
-  function handleError(e,prefix){console.error(prefix,e);showToast(`${prefix} ${e?.message||"Check your connection and try again."}`,"error");}
-
-  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
-  init();
+  document.addEventListener('DOMContentLoaded',init);
 })();
