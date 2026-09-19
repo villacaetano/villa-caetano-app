@@ -1,0 +1,446 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Arial,
+        sans-serif;
+
+    background: #f5f6f8;
+    color: #1f2937;
+}
+
+
+/* GENERAL */
+
+.hidden {
+    display: none !important;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+
+/* LOGIN */
+
+.screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    background: white;
+    padding: 45px 35px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+}
+
+.logo {
+    font-size: 55px;
+    margin-bottom: 15px;
+}
+
+.login-card h1 {
+    font-size: 28px;
+    margin-bottom: 5px;
+}
+
+.subtitle {
+    color: #6b7280;
+    margin-bottom: 30px;
+}
+
+
+/* GOOGLE BUTTON */
+
+.google-button {
+    width: 100%;
+    border: 1px solid #ddd;
+    background: white;
+    padding: 13px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+}
+
+.google-button:hover {
+    background: #f8f8f8;
+}
+
+.google-button span {
+    font-weight: 700;
+    font-size: 18px;
+}
+
+
+/* TOP BAR */
+
+.topbar {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 18px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.topbar h1 {
+    font-size: 20px;
+}
+
+.topbar span {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.user-area {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logout-button {
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+}
+
+
+/* CONTAINER */
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 30px 20px;
+}
+
+
+/* WELCOME */
+
+.welcome {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.welcome h2 {
+    font-size: 25px;
+    margin-bottom: 5px;
+}
+
+.welcome p {
+    color: #6b7280;
+}
+
+
+/* BUTTONS */
+
+.primary-button {
+    background: #111827;
+    color: white;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 9px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.primary-button:hover {
+    background: #374151;
+}
+
+.secondary-button {
+    background: #f3f4f6;
+    color: #374151;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 9px;
+    cursor: pointer;
+}
+
+
+/* STATS */
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+}
+
+.stat-number {
+    display: block;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: #6b7280;
+    font-size: 14px;
+}
+
+
+/* FILTERS */
+
+.filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+}
+
+.filters input,
+.filters select {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 9px;
+    padding: 11px 13px;
+}
+
+.filters input {
+    flex: 1;
+}
+
+
+/* SECTION HEADING */
+
+.section-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.section-heading h2 {
+    font-size: 20px;
+}
+
+.section-heading span {
+    color: #6b7280;
+    font-size: 14px;
+}
+
+
+/* ISSUE CARD */
+
+.issue-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 12px;
+}
+
+.issue-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.issue-title {
+    font-weight: 650;
+    font-size: 17px;
+    margin-bottom: 6px;
+}
+
+.issue-description {
+    color: #6b7280;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.issue-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 20px;
+    background: #f3f4f6;
+    font-size: 12px;
+}
+
+.priority-Urgent {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.priority-High {
+    background: #ffedd5;
+    color: #9a3412;
+}
+
+.priority-Normal {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.priority-Low {
+    background: #dcfce7;
+    color: #166534;
+}
+
+
+/* EMPTY */
+
+.empty-state {
+    background: white;
+    border: 1px dashed #d1d5db;
+    border-radius: 14px;
+    padding: 50px 20px;
+    text-align: center;
+}
+
+.empty-icon {
+    font-size: 40px;
+    margin-bottom: 10px;
+}
+
+.empty-state h3 {
+    margin-bottom: 6px;
+}
+
+.empty-state p {
+    color: #6b7280;
+}
+
+
+/* MODAL */
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 1000;
+}
+
+.modal-card {
+    width: 100%;
+    max-width: 550px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: white;
+    border-radius: 16px;
+    padding: 25px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.close-button {
+    border: none;
+    background: transparent;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+
+/* FORM */
+
+form label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+
+form input,
+form select,
+form textarea {
+    display: block;
+    width: 100%;
+    margin-top: 7px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 11px;
+    background: white;
+}
+
+form textarea {
+    resize: vertical;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+
+/* MOBILE */
+
+@media (max-width: 700px) {
+
+    .topbar {
+        padding: 15px 18px;
+    }
+
+    .user-area span {
+        display: none;
+    }
+
+    .container {
+        padding: 20px 15px;
+    }
+
+    .welcome {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .filters {
+        flex-direction: column;
+    }
+
+    .issue-top {
+        flex-direction: column;
+    }
+
+}
