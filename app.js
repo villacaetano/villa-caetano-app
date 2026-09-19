@@ -1,502 +1,60 @@
-import {
-    auth, db, provider, signInWithPopup, signOut, onAuthStateChanged,
-    collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy
-} from "./firebase.js";
-
-let currentUser = null;
-let issues = [];
-let deleteTargetIssue = null;
-let editTargetIssue = null;
-let activeView = "active";
-
-const $ = id => document.getElementById(id);
-const loginScreen = $("loginScreen"), appScreen = $("app");
-const googleLoginBtn = $("googleLoginBtn"), logoutBtn = $("logoutBtn");
-const userName = $("userName"), userAvatar = $("userAvatar");
-const addIssueBtn = $("addIssueBtn"), issueModal = $("issueModal");
-const closeModalBtn = $("closeModalBtn"), cancelIssueBtn = $("cancelIssueBtn");
-const issueForm = $("issueForm"), issuesList = $("issuesList");
-const searchInput = $("searchInput"), statusFilter = $("statusFilter"), priorityFilter = $("priorityFilter");
-const clearFiltersBtn = $("clearFiltersBtn");
-const activeViewBtn = $("activeViewBtn"), historyViewBtn = $("historyViewBtn");
-const deleteModal = $("deleteModal"), deleteConfirmInput = $("deleteConfirmInput");
-const confirmDeleteBtn = $("confirmDeleteBtn"), cancelDeleteBtn = $("cancelDeleteBtn");
-const editModal = $("editModal"), editIssueForm = $("editIssueForm");
-const assignedButton = $("assignedButton"), assignedButtonText = $("assignedButtonText"), assignedMenu = $("assignedMenu");
-const editAssignedButton = $("editAssignedButton"), editAssignedButtonText = $("editAssignedButtonText"), editAssignedMenu = $("editAssignedMenu");
-
-const categoryIcons = {
-    Pool:"◉", Garden:"✦", Electrical:"⚡", Plumbing:"⌁",
-    "Air Conditioning":"❄", Building:"⌂", Security:"◇",
-    Cleaning:"✧", Furniture:"▣", Appliances:"▤", Other:"•"
-};
-
-function todayString() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-function setDueDateMinimums() {
-    $("issueDueDate").min = todayString();
-    $("editIssueDueDate").min = todayString();
-}
-setDueDateMinimums();
-
-function setupAssignedPicker(button, buttonText, menu, otherInput) {
-    button.addEventListener("click", e => {
-        e.stopPropagation();
-        document.querySelectorAll(".multi-select-menu").forEach(m => {
-            if (m !== menu) m.classList.add("hidden");
-        });
-        menu.classList.toggle("hidden");
-    });
-    menu.querySelector(".done-select-button").addEventListener("click", e => {
-        e.stopPropagation();
-        updateAssignedButton(button, buttonText, menu, otherInput);
-        menu.classList.add("hidden");
-    });
-    menu.addEventListener("click", e => e.stopPropagation());
-    menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener("change", () => updateAssignedButton(button, buttonText, menu, otherInput));
-    });
-    otherInput.addEventListener("input", () => updateAssignedButton(button, buttonText, menu, otherInput));
-}
-function updateAssignedButton(button, buttonText, menu, otherInput) {
-    const values = [...menu.querySelectorAll('input[type="checkbox"]:checked')].map(x => x.value);
-    const custom = otherInput.value.trim();
-    if (custom) values.push(custom);
-    buttonText.textContent = values.length ? values.join(", ") : "Select people / teams";
-    button.classList.toggle("has-selection", values.length > 0);
-}
-function getAssignedValues(menu, otherInput) {
-    const values = [...menu.querySelectorAll('input[type="checkbox"]:checked')].map(x => x.value);
-    const custom = otherInput.value.trim();
-    if (custom) values.push(custom);
-    return [...new Set(values)];
-}
-function setAssignedValues(menu, otherInput, button, buttonText, rawValue) {
-    const values = Array.isArray(rawValue) ? rawValue : (rawValue ? [rawValue] : []);
-    menu.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = values.includes(cb.value));
-    const known = new Set([...menu.querySelectorAll('input[type="checkbox"]')].map(cb => cb.value));
-    otherInput.value = values.filter(v => !known.has(v)).join(", ");
-    updateAssignedButton(button, buttonText, menu, otherInput);
-}
-setupAssignedPicker(assignedButton, assignedButtonText, assignedMenu, $("assignedOther"));
-setupAssignedPicker(editAssignedButton, editAssignedButtonText, editAssignedMenu, $("editAssignedOther"));
-
-document.addEventListener("click", () => {
-    document.querySelectorAll(".multi-select-menu").forEach(m => m.classList.add("hidden"));
-});
-
-googleLoginBtn.addEventListener("click", async () => {
-    googleLoginBtn.disabled = true;
-    googleLoginBtn.querySelector("span:last-child").textContent = "Signing in…";
-    try { await signInWithPopup(auth, provider); }
-    catch (error) {
-        console.error(error);
-        alert(`Login failed: ${error.code || error.message || "Please try again."}`);
-    }
-    finally {
-        googleLoginBtn.disabled = false;
-        googleLoginBtn.querySelector("span:last-child").textContent = "Continue with Google";
-    }
-});
-
-logoutBtn.addEventListener("click", async () => {
-    try { await signOut(auth); } catch (error) { console.error(error); }
-});
-
-onAuthStateChanged(auth, async user => {
-    if (user) {
-        currentUser = user;
-        loginScreen.classList.add("hidden");
-        appScreen.classList.remove("hidden");
-        userName.textContent = user.displayName || user.email || "User";
-        userAvatar.textContent = initials(user.displayName || user.email || "VC");
-        await loadIssues();
-    } else {
-        currentUser = null;
-        loginScreen.classList.remove("hidden");
-        appScreen.classList.add("hidden");
-    }
-});
-
-addIssueBtn.addEventListener("click", () => issueModal.classList.remove("hidden"));
-closeModalBtn.addEventListener("click", closeIssueModal);
-cancelIssueBtn.addEventListener("click", closeIssueModal);
-issueModal.addEventListener("click", e => { if (e.target === issueModal) closeIssueModal(); });
-
-function closeIssueModal() {
-    issueModal.classList.add("hidden");
-    issueForm.reset();
-    setAssignedValues(assignedMenu, $("assignedOther"), assignedButton, assignedButtonText, []);
-    setDueDateMinimums();
-}
-
-issueForm.addEventListener("submit", async event => {
-    event.preventDefault();
-    if (!currentUser) return;
-    const dueDate = $("issueDueDate").value;
-    if (dueDate && dueDate < todayString()) {
-        alert("Due date cannot be in the past. Please choose today or a future date.");
-        $("issueDueDate").focus();
-        return;
-    }
-    const issue = {
-        title: $("issueTitle").value.trim(),
-        category: $("issueCategory").value,
-        priority: $("issuePriority").value,
-        assignedTo: getAssignedValues(assignedMenu, $("assignedOther")),
-        dueDate,
-        cost: Number($("issueCost").value) || 0,
-        description: $("issueDescription").value.trim(),
-        status: "Open",
-        createdAt: new Date().toISOString(),
-        createdBy: currentUser.uid
-    };
-    try {
-        await addDoc(collection(db, "issues"), issue);
-        closeIssueModal();
-        showToast("Issue created");
-        await loadIssues();
-    } catch (error) {
-        console.error(error);
-        alert("Could not save the issue.");
-    }
-});
-
-async function loadIssues() {
-    try {
-        const issuesQuery = query(collection(db, "issues"), orderBy("createdAt", "desc"));
-        const snapshot = await getDocs(issuesQuery);
-        issues = snapshot.docs.map(document => ({ id: document.id, ...document.data() }));
-        renderIssues();
-    } catch (error) {
-        console.error(error);
-        alert("Could not load maintenance issues.");
-    }
-}
-
-function renderIssues() {
-    const search = searchInput.value.trim().toLowerCase();
-    const status = statusFilter.value;
-    const priority = priorityFilter.value;
-    const today = localDateString();
-
-    let filtered = issues.filter(issue => {
-        const assignedSearch = Array.isArray(issue.assignedTo) ? issue.assignedTo.join(" ") : (issue.assignedTo || "");
-        const matchesSearch = [issue.title, issue.description, issue.category, assignedSearch]
-            .some(v => String(v || "").toLowerCase().includes(search));
-        const matchesPriority = priority === "all" || issue.priority === priority;
-        const isOverdue = issue.status !== "Completed" && issue.dueDate && issue.dueDate < today;
-
-        // Explicit status selection overrides Active/History.
-        // This means selecting "Completed" always shows completed records,
-        // even if the History tab is not selected.
-        const matchesStatus = status === "all" || issue.status === status;
-        const viewMatches = status !== "all"
-            ? true
-            : (activeView === "history" ? issue.status === "Completed" : issue.status !== "Completed");
-
-        return matchesSearch && matchesStatus && matchesPriority && viewMatches;
-    });
-
-    filtered.sort((a,b) => {
-        if (activeView === "history" || status === "Completed") {
-            return dateValue(b.completedAt || b.createdAt) - dateValue(a.completedAt || a.createdAt);
-        }
-        return (issueRank(b) - issueRank(a)) || (dateValue(b.createdAt) - dateValue(a.createdAt));
-    });
-
-    issuesList.innerHTML = "";
-    if (!filtered.length) {
-        issuesList.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">${activeView === "history" || status === "Completed" ? "✓" : "◌"}</div>
-                <h3>${activeView === "history" || status === "Completed" ? "No completed issues" : "Nothing needs attention"}</h3>
-                <p>${activeView === "history" || status === "Completed" ? "Completed maintenance will appear here." : "You're all caught up, or nothing matches your filters."}</p>
-            </div>`;
-    } else {
-        filtered.forEach(issue => issuesList.appendChild(createIssueCard(issue)));
-    }
-
-    $("issueCount").textContent = `${filtered.length} ${filtered.length === 1 ? "issue" : "issues"}`;
-    updateStatistics();
-    clearFiltersBtn.classList.toggle("hidden", !(search || status !== "all" || priority !== "all"));
-}
-
-function issueRank(issue) {
-    const overdue = issue.status !== "Completed" && issue.dueDate && issue.dueDate < localDateString();
-    const priority = {Urgent:40, High:30, Normal:20, Low:10}[issue.priority] || 0;
-    return (overdue ? 100 : 0) + priority;
-}
-
-function createIssueCard(issue) {
-    const card = document.createElement("article");
-    const completed = issue.status === "Completed";
-    const overdue = !completed && issue.dueDate && issue.dueDate < localDateString();
-    const priorityClass = `priority-${safeClass(issue.priority)}`;
-    card.className = `issue-card ${priorityClass} ${completed ? "completed" : ""} ${overdue ? "overdue-card" : ""}`;
-
-    const dueText = issue.dueDate ? formatDate(issue.dueDate) : "";
-    const costText = Number(issue.cost) ? `₹${Number(issue.cost).toLocaleString("en-IN", {maximumFractionDigits:2})}` : "";
-    const icon = categoryIcons[issue.category] || "•";
-    const categoryClass = `category-${safeClass(issue.category)}`;
-    const assignees = Array.isArray(issue.assignedTo) ? issue.assignedTo : (issue.assignedTo ? [issue.assignedTo] : []);
-
-    card.innerHTML = `
-        <div class="issue-main">
-            <div>
-                <div class="issue-title-row">
-                    ${completed ? `<span class="done-check">✓</span>` : ""}
-                    <div class="issue-title">${escapeHtml(issue.title)}</div>
-                </div>
-                ${issue.description ? `<div class="issue-description">${escapeHtml(issue.description)}</div>` : ""}
-                <div class="issue-meta">
-                    <span class="badge ${categoryClass}">${icon} ${escapeHtml(issue.category || "Other")}</span>
-                    <span class="badge priority-${safeClass(issue.priority)}">${escapeHtml(issue.priority || "Normal")}</span>
-                    <span class="badge status-${safeClass(issue.status)}">${completed ? "✓ Done" : escapeHtml(issue.status || "Open")}</span>
-                    ${assignees.length ? `<span class="badge assignee-chip">👤 ${escapeHtml(assignees.join(" · "))}</span>` : ""}
-                    ${dueText ? `<span class="badge ${overdue ? "overdue" : ""}">${overdue ? "⚠ " : "📅 "}${escapeHtml(dueText)}${overdue ? " · Overdue" : ""}</span>` : ""}
-                    ${costText ? `<span class="badge">₹ ${costText.replace("₹","")}</span>` : ""}
-                    ${completed && issue.completedAt ? `<span class="badge">✓ ${escapeHtml(formatDateTime(issue.completedAt))}</span>` : ""}
-                </div>
-            </div>
-            <div class="issue-actions">
-                <select class="status-change" aria-label="Change status">
-                    <option ${issue.status === "Open" ? "selected" : ""}>Open</option>
-                    <option ${issue.status === "In Progress" ? "selected" : ""}>In Progress</option>
-                    <option ${issue.status === "Waiting" ? "selected" : ""}>Waiting</option>
-                    <option ${issue.status === "Completed" ? "selected" : ""}>Completed</option>
-                </select>
-                <button class="more-button" title="More actions" aria-label="More actions">•••</button>
-            </div>
-        </div>`;
-
-    card.querySelector(".status-change").addEventListener("change", async e => {
-        const newStatus = e.target.value;
-        try {
-            const updates = { status: newStatus };
-            if (newStatus === "Completed") updates.completedAt = new Date().toISOString();
-            else updates.completedAt = null;
-            await updateDoc(doc(db, "issues", issue.id), updates);
-            showToast(newStatus === "Completed" ? "Issue marked as done ✓" : `Status changed to ${newStatus}`);
-            await loadIssues();
-        } catch (error) {
-            console.error(error);
-            alert("Could not update the issue.");
-        }
-    });
-
-    const moreButton = card.querySelector(".more-button");
-    moreButton.addEventListener("click", e => {
-        e.stopPropagation();
-        document.querySelectorAll(".more-menu").forEach(m => m.remove());
-        const menu = document.createElement("div");
-        menu.className = "more-menu";
-        menu.innerHTML = `
-            <button type="button" class="menu-edit">✎ Edit issue</button>
-            <button type="button" class="menu-delete">Delete issue</button>`;
-        card.appendChild(menu);
-        menu.querySelector(".menu-edit").addEventListener("click", () => {
-            menu.remove();
-            openEditModal(issue);
-        });
-        menu.querySelector(".menu-delete").addEventListener("click", () => {
-            menu.remove();
-            openDeleteModal(issue);
-        });
-    });
-
-    return card;
-}
-
-function updateStatistics() {
-    const today = localDateString();
-    $("openCount").textContent = issues.filter(i => i.status === "Open").length;
-    $("progressCount").textContent = issues.filter(i => i.status === "In Progress").length;
-    $("completedCount").textContent = issues.filter(i => i.status === "Completed").length;
-    $("overdueCount").textContent = issues.filter(i =>
-        i.status !== "Completed" && i.dueDate && i.dueDate < today
-    ).length;
-}
-
-function openEditModal(issue) {
-    editTargetIssue = issue;
-    $("editIssueTitle").value = issue.title || "";
-    $("editIssueCategory").value = issue.category || "";
-    $("editIssuePriority").value = issue.priority || "Normal";
-    setAssignedValues(editAssignedMenu, $("editAssignedOther"), editAssignedButton, editAssignedButtonText, issue.assignedTo);
-    $("editIssueDueDate").value = issue.dueDate || "";
-    const editDueHelp = $("editDueHelp");
-    if (issue.dueDate && issue.dueDate < todayString()) {
-        $("editIssueDueDate").removeAttribute("min");
-        editDueHelp.textContent = "This issue is already overdue. Leave the date unchanged or choose today / a future date.";
-    } else {
-        $("editIssueDueDate").min = todayString();
-        editDueHelp.textContent = "Choose today or a future date.";
-    }
-    $("editIssueCost").value = Number(issue.cost) || "";
-    $("editIssueStatus").value = issue.status || "Open";
-    $("editIssueDescription").value = issue.description || "";
-    editModal.classList.remove("hidden");
-    setTimeout(() => $("editIssueTitle").focus(), 50);
-}
-function closeEditModal() {
-    editTargetIssue = null;
-    editModal.classList.add("hidden");
-    editIssueForm.reset();
-}
-$("closeEditModalBtn").addEventListener("click", closeEditModal);
-$("cancelEditBtn").addEventListener("click", closeEditModal);
-editModal.addEventListener("click", e => { if (e.target === editModal) closeEditModal(); });
-
-editIssueForm.addEventListener("submit", async event => {
-    event.preventDefault();
-    if (!editTargetIssue) return;
-    const newStatus = $("editIssueStatus").value;
-    const newDueDate = $("editIssueDueDate").value;
-    if (newDueDate && newDueDate < todayString() && newDueDate !== (editTargetIssue.dueDate || "")) {
-        alert("Due date cannot be in the past. Please choose today or a future date.");
-        $("editIssueDueDate").focus();
-        return;
-    }
-    const updates = {
-        title: $("editIssueTitle").value.trim(),
-        category: $("editIssueCategory").value,
-        priority: $("editIssuePriority").value,
-        assignedTo: getAssignedValues(editAssignedMenu, $("editAssignedOther")),
-        dueDate: $("editIssueDueDate").value,
-        cost: Number($("editIssueCost").value) || 0,
-        status: newStatus,
-        description: $("editIssueDescription").value.trim()
-    };
-    if (newStatus === "Completed") updates.completedAt = editTargetIssue.completedAt || new Date().toISOString();
-    else updates.completedAt = null;
-
-    try {
-        await updateDoc(doc(db, "issues", editTargetIssue.id), updates);
-        closeEditModal();
-        showToast("Issue updated");
-        await loadIssues();
-    } catch (error) {
-        console.error(error);
-        alert("Could not update the issue.");
-    }
-});
-
-function openDeleteModal(issue) {
-    deleteTargetIssue = issue;
-    $("deleteTarget").textContent = issue.title || "Untitled issue";
-    deleteConfirmInput.value = "";
-    confirmDeleteBtn.disabled = true;
-    deleteModal.classList.remove("hidden");
-    setTimeout(() => deleteConfirmInput.focus(), 50);
-}
-
-function closeDeleteModal() {
-    deleteTargetIssue = null;
-    deleteConfirmInput.value = "";
-    confirmDeleteBtn.disabled = true;
-    deleteModal.classList.add("hidden");
-}
-cancelDeleteBtn.addEventListener("click", closeDeleteModal);
-deleteModal.addEventListener("click", e => { if (e.target === deleteModal) closeDeleteModal(); });
-deleteConfirmInput.addEventListener("input", () => {
-    confirmDeleteBtn.disabled = deleteConfirmInput.value !== "DELETE";
-});
-confirmDeleteBtn.addEventListener("click", async () => {
-    if (!deleteTargetIssue || deleteConfirmInput.value !== "DELETE") return;
-    try {
-        await deleteDoc(doc(db, "issues", deleteTargetIssue.id));
-        closeDeleteModal();
-        showToast("Issue deleted");
-        await loadIssues();
-    } catch (error) {
-        console.error(error);
-        alert("Could not delete the issue.");
-    }
-});
-
-searchInput.addEventListener("input", renderIssues);
-statusFilter.addEventListener("change", renderIssues);
-priorityFilter.addEventListener("change", renderIssues);
-
-clearFiltersBtn.addEventListener("click", () => {
-    searchInput.value = "";
-    statusFilter.value = "all";
-    priorityFilter.value = "all";
-    renderIssues();
-});
-
-activeViewBtn.addEventListener("click", () => setView("active"));
-historyViewBtn.addEventListener("click", () => setView("history"));
-
-function setView(view) {
-    activeView = view;
-    // Tabs are the broad view. Choosing a specific status remains the explicit override.
-    statusFilter.value = "all";
-    activeViewBtn.classList.toggle("active", view === "active");
-    historyViewBtn.classList.toggle("active", view === "history");
-    renderIssues();
-}
-
-document.querySelectorAll("[data-status-shortcut]").forEach(button => {
-    button.addEventListener("click", () => {
-        const value = button.dataset.statusShortcut;
-        if (value === "overdue") {
-            statusFilter.value = "all";
-            priorityFilter.value = "all";
-            searchInput.value = "";
-            activeView = "active";
-            activeViewBtn.classList.add("active");
-            historyViewBtn.classList.remove("active");
-        } else {
-            activeView = value === "Completed" ? "history" : "active";
-            activeViewBtn.classList.toggle("active", activeView === "active");
-            historyViewBtn.classList.toggle("active", activeView === "history");
-            statusFilter.value = value;
-        }
-        renderIssues();
-        window.scrollTo({top: 240, behavior:"smooth"});
-    });
-});
-
-function localDateString() {
-    const d = new Date();
-    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
-    return `${y}-${m}-${day}`;
-}
-function formatDate(value) {
-    const d = new Date(`${value}T00:00:00`);
-    return d.toLocaleDateString("en-IN", {day:"numeric", month:"short", year:"numeric"});
-}
-function formatDateTime(value) {
-    const d = new Date(value);
-    return d.toLocaleDateString("en-IN", {day:"numeric", month:"short", year:"numeric"});
-}
-document.addEventListener("click", () => {
-    document.querySelectorAll(".more-menu").forEach(m => m.remove());
-});
-function dateValue(value) {
-    const n = Date.parse(value || "");
-    return Number.isFinite(n) ? n : 0;
-}
-function safeClass(value) {
-    return String(value || "").replace(/[^a-zA-Z0-9-]/g, "-");
-}
-function initials(value) {
-    const parts = String(value).trim().split(/\s+/).filter(Boolean);
-    return (parts.length > 1 ? parts[0][0] + parts[parts.length-1][0] : parts[0]?.slice(0,2) || "VC").toUpperCase();
-}
-function escapeHtml(value) {
-    const div = document.createElement("div");
-    div.textContent = value ?? "";
-    return div.innerHTML;
-}
-function showToast(message) {
-    const toast = $("toast");
-    toast.textContent = message;
-    toast.classList.remove("hidden");
-    clearTimeout(showToast.timer);
-    showToast.timer = setTimeout(() => toast.classList.add("hidden"), 2400);
-}
+import {auth,db,provider,signInWithPopup,signOut,onAuthStateChanged,collection,addDoc,getDocs,getDoc,doc,updateDoc,deleteDoc,query,orderBy} from "./firebase.js";
+let currentUser=null, role="reporter", issues=[], recurring=[], bills=[], expenses=[], deleteTarget=null, editTarget=null, completeTarget=null, activeView="active";
+const $=id=>document.getElementById(id); const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+const ADMIN_ROLES=["admin","owner","property manager"]; const isAdmin=()=>ADMIN_ROLES.includes(String(role).toLowerCase());
+const ASSIGNEES=["Owner","Caretaker","Contractor","Property Management","Electrician","Plumber","Pool / Garden","Other"];
+const categoryIcons={Pool:"◉",Garden:"✦",Electrical:"⚡",Plumbing:"⌁","Air Conditioning":"❄",Building:"⌂",Security:"◇",Cleaning:"✧",Furniture:"▣",Appliances:"▤",Other:"•"};
+function esc(v){const d=document.createElement("div");d.textContent=v??"";return d.innerHTML} function cls(v){return String(v||"").replace(/[^a-zA-Z0-9-]/g,"-")};
+function money(v){return `₹${Number(v||0).toLocaleString("en-IN",{maximumFractionDigits:2})}`} function fmtDate(v){if(!v)return "";return new Date(`${v}T00:00:00`).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})};
+function fmtDateTime(v){return v?new Date(v).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):""};
+function dateMs(v){const n=Date.parse(v||"");return Number.isFinite(n)?n:0};
+function showToast(m){const t=$("toast");t.textContent=m;t.classList.remove("hidden");clearTimeout(showToast.t);showToast.t=setTimeout(()=>t.classList.add("hidden"),2400)}
+function closeModal(id){$(id).classList.add("hidden");}
+function setMinDates(){["issueDueDate","editIssueDueDate","recurringNextDue","billNextDue","expenseDate"].forEach(id=>{if($(id))$(id).min=today()})}
+function populateAssigneeMenus(){["assignedMenu","editAssignedMenu","recurringAssignedMenu"].forEach(id=>{const m=$(id);m.innerHTML=ASSIGNEES.map(x=>`<label><input type="checkbox" value="${esc(x)}"><span>${esc(x)}</span></label>`).join("")+`<input class="assigned-other" placeholder="Optional name / company"><button type="button" class="done-select-button">Done</button>`;});}
+function picker(menuId,buttonId,textId){const m=$(menuId),b=$(buttonId),t=$(textId);b.onclick=e=>{e.stopPropagation();document.querySelectorAll(".multi-select-menu").forEach(x=>x.classList.add("hidden"));m.classList.toggle("hidden")};m.addEventListener("click",e=>e.stopPropagation());m.querySelector(".done-select-button").onclick=()=>m.classList.add("hidden");m.addEventListener("change",()=>updatePicker(m,t,b));m.querySelector(".assigned-other").addEventListener("input",()=>updatePicker(m,t,b));return {m,b,t}}
+function updatePicker(m,t,b){const vals=getPickerValues(m);t.textContent=vals.length?vals.join(", "):"Select people / teams";b.classList.toggle("has-selection",!!vals.length)}
+function getPickerValues(m){const vals=[...m.querySelectorAll('input[type="checkbox"]:checked')].map(x=>x.value);const other=m.querySelector(".assigned-other").value.trim();if(other)vals.push(other);return [...new Set(vals)]}
+function setPickerValues(m,b,t,raw){const vals=Array.isArray(raw)?raw:(raw?[raw]:[]);m.querySelectorAll('input[type="checkbox"]').forEach(x=>x.checked=vals.includes(x.value));const known=new Set(ASSIGNEES);m.querySelector(".assigned-other").value=vals.filter(x=>!known.has(x)).join(", ");updatePicker(m,t,b)}
+populateAssigneeMenus();const addPick=picker("assignedMenu","assignedButton","assignedButtonText"),editPick=picker("editAssignedMenu","editAssignedButton","editAssignedButtonText"),recPick=picker("recurringAssignedMenu","recurringAssignedButton","recurringAssignedButtonText");
+document.addEventListener("click",()=>document.querySelectorAll(".multi-select-menu,.more-menu").forEach(x=>x.classList.add("hidden")));
+$("googleLoginBtn").onclick=async()=>{const b=$("googleLoginBtn");b.disabled=true;b.querySelector("span:last-child").textContent="Signing in…";try{await signInWithPopup(auth,provider)}catch(e){console.error(e);alert(`Login failed: ${e.code||e.message}`)}finally{b.disabled=false;b.querySelector("span:last-child").textContent="Continue with Google"}};
+$("logoutBtn").onclick=()=>signOut(auth);
+onAuthStateChanged(auth,async u=>{if(!u){currentUser=null;$("loginScreen").classList.remove("hidden");$("app").classList.add("hidden");return}currentUser=u;$("loginScreen").classList.add("hidden");$("app").classList.remove("hidden");$("userName").textContent=u.displayName||u.email||"User";$("userAvatar").textContent=(u.displayName||u.email||"VC").split(/\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase();await loadRole();await loadAll();setMinDates();});
+async function loadRole(){try{const s=await getDoc(doc(db,"users",currentUser.uid));role=s.exists()?(s.data().role||"reporter"):"reporter"}catch(e){console.error(e);role="reporter"}$("roleBadge").textContent=isAdmin()?"ADMIN":"REPORTER";$("userRoleText").textContent=isAdmin()?"Owner / Property manager":"Report & view";document.querySelectorAll(".admin-only").forEach(x=>x.classList.toggle("hidden",!isAdmin()))}
+async function loadAll(){await Promise.all([loadIssues(),loadRecurring(),isAdmin()?loadBills():Promise.resolve(),isAdmin()?loadExpenses():Promise.resolve()]);renderAll()}
+async function safeGet(name,sortField="createdAt"){try{const s=await getDocs(query(collection(db,name),orderBy(sortField,"desc")));return s.docs.map(x=>({id:x.id,...x.data()}))}catch(e){console.error(name,e);return []}}
+async function loadIssues(){issues=await safeGet("issues")};async function loadRecurring(){recurring=await safeGet("recurringTasks","nextDue")};async function loadBills(){bills=await safeGet("bills","nextDue")};async function loadExpenses(){expenses=await safeGet("expenses","date")};
+function navigate(section){document.querySelectorAll(".app-section").forEach(x=>x.classList.add("hidden"));$(section+"Section").classList.remove("hidden");document.querySelectorAll(".nav-button").forEach(x=>x.classList.toggle("active",x.dataset.section===section));window.scrollTo({top:0,behavior:"smooth"})}
+document.querySelectorAll(".nav-button").forEach(b=>b.onclick=()=>navigate(b.dataset.section));document.querySelectorAll("[data-section-link]").forEach(b=>b.onclick=()=>navigate(b.dataset.sectionLink));
+function renderAll(){renderIssues();renderRecurring();renderBills();renderExpenses();renderDashboard();}
+function renderDashboard(){const t=today();$("openCount").textContent=issues.filter(x=>x.status==="Open").length;$("progressCount").textContent=issues.filter(x=>x.status==="In Progress").length;$("completedCount").textContent=issues.filter(x=>x.status==="Completed").length;$("overdueCount").textContent=issues.filter(x=>x.status!=="Completed"&&x.dueDate&&x.dueDate<t).length;if(isAdmin()){const ms=new Date();const ym=`${ms.getFullYear()}-${String(ms.getMonth()+1).padStart(2,"0")}`;const ys=String(ms.getFullYear());$("monthSpend").textContent=money(expenses.filter(x=>String(x.date||"").startsWith(ym)).reduce((a,x)=>a+Number(x.amount||0),0));$("yearSpend").textContent=money(expenses.filter(x=>String(x.date||"").startsWith(ys)).reduce((a,x)=>a+Number(x.amount||0),0));const monthlyBills=bills.reduce((a,b)=>a+billMonthly(b),0);const monthlyRecurring=recurring.filter(x=>x.active!==false).reduce((a,x)=>a+recMonthly(x),0);$("monthlyProjection").textContent=money(monthlyBills+monthlyRecurring);$("annualProjection").textContent=money((monthlyBills+monthlyRecurring)*12);$("monthlyBillsTotal").textContent=money(monthlyBills);$("yearlyBillsTotal").textContent=money(bills.filter(x=>x.type==="Yearly").reduce((a,x)=>a+Number(x.amount||0),0))}const upcoming=[...recurring.filter(x=>x.active!==false&&x.nextDue).sort((a,b)=>dateMs(a.nextDue)-dateMs(b.nextDue)).slice(0,5),...issues.filter(x=>x.status!=="Completed"&&x.dueDate).sort((a,b)=>dateMs(a.dueDate)-dateMs(b.dueDate)).slice(0,5)].sort((a,b)=>dateMs(a.nextDue||a.dueDate)-dateMs(b.nextDue||b.dueDate)).slice(0,6);$("dashboardNext").innerHTML=upcoming.length?upcoming.map(x=>`<div class="next-row"><div class="next-icon">${x.nextDue?"↻":"!"}</div><div><strong>${esc(x.title)}</strong><span>${x.nextDue?"Recurring task":"Issue"} · ${fmtDate(x.nextDue||x.dueDate)}</span></div><span class="next-arrow">→</span></div>`).join(""):empty("Nothing coming up","You're all caught up.")}
+function empty(h,p){return `<div class="empty-state"><div class="empty-icon">◌</div><h3>${h}</h3><p>${p}</p></div>`}
+function renderIssues(){const search=$("searchInput").value.trim().toLowerCase(),status=$("statusFilter").value,priority=$("priorityFilter").value,t=today();let f=issues.filter(i=>{const a=Array.isArray(i.assignedTo)?i.assignedTo.join(" "):(i.assignedTo||"");const ms=[i.title,i.description,i.category,a].some(v=>String(v||"").toLowerCase().includes(search));const mp=priority==="all"||i.priority===priority;const msx=status==="all"||i.status===status;const mv=status!=="all"||(activeView==="history"?i.status==="Completed":i.status!=="Completed");return ms&&mp&&msx&&mv});f.sort((a,b)=>activeView==="history"||status==="Completed"?dateMs(b.completedAt||b.createdAt)-dateMs(a.completedAt||a.createdAt):issueRank(b)-issueRank(a)||dateMs(b.createdAt)-dateMs(a.createdAt));$("issuesList").innerHTML=f.length?f.map(issueCard).join(""):empty(activeView==="history"||status==="Completed"?"No completed issues":"Nothing needs attention","Try another filter or report a new problem.");$("issueCount").textContent=`${f.length} ${f.length===1?"issue":"issues"}`;$("clearFiltersBtn").classList.toggle("hidden",!(search||status!=="all"||priority!=="all"))}
+function issueRank(i){return ((i.status!=="Completed"&&i.dueDate&&i.dueDate<today())?100:0)+({Urgent:40,High:30,Normal:20,Low:10}[i.priority]||0)}
+function issueCard(i){const done=i.status==="Completed",over=!done&&i.dueDate&&i.dueDate<today(),ass=Array.isArray(i.assignedTo)?i.assignedTo:(i.assignedTo?[i.assignedTo]:[]);return `<article class="issue-card priority-${cls(i.priority)} ${done?"completed":""} ${over?"overdue-card":""}"><div class="issue-main"><div><div class="issue-title-row">${done?'<span class="done-check">✓</span>':''}<div class="issue-title">${esc(i.title)}</div></div>${i.description?`<div class="issue-description">${esc(i.description)}</div>`:""}<div class="issue-meta"><span class="badge category-${cls(i.category)}">${categoryIcons[i.category]||"•"} ${esc(i.category||"Other")}</span><span class="badge priority-${cls(i.priority)}">${esc(i.priority||"Normal")}</span><span class="badge status-${cls(i.status)}">${done?"✓ Done":esc(i.status||"Open")}</span>${ass.length?`<span class="badge assignee-chip">👤 ${esc(ass.join(" · "))}</span>`:""}${i.dueDate?`<span class="badge ${over?"overdue":""}">${over?"⚠ ":"📅 "}${fmtDate(i.dueDate)}${over?" · Overdue":""}</span>`:""}${Number(i.cost)?`<span class="badge">${money(i.cost)}</span>`:""}${done&&i.completedAt?`<span class="badge">✓ ${fmtDateTime(i.completedAt)}</span>`:""}</div></div><div class="issue-actions">${isAdmin()?`<select class="status-change" data-id="${i.id}"><option ${i.status==="Open"?"selected":""}>Open</option><option ${i.status==="In Progress"?"selected":""}>In Progress</option><option ${i.status==="Waiting"?"selected":""}>Waiting</option><option ${i.status==="Completed"?"selected":""}>Completed</option></select>`:""}<button class="more-button" data-more="${i.id}">•••</button></div></div></article>`}
+$("issuesList").addEventListener("change",async e=>{if(!e.target.matches(".status-change"))return;const id=e.target.dataset.id,newStatus=e.target.value;try{await updateDoc(doc(db,"issues",id),{status:newStatus,completedAt:newStatus==="Completed"?new Date().toISOString():null,updatedAt:new Date().toISOString(),updatedBy:currentUser.uid});showToast(newStatus==="Completed"?"Marked as done ✓":"Status updated");await loadIssues();renderAll()}catch(e){console.error(e);alert("Could not update the issue.")}});
+$("issuesList").addEventListener("click",e=>{const b=e.target.closest("[data-more]");if(!b)return;document.querySelectorAll(".more-menu").forEach(x=>x.remove());const i=issues.find(x=>x.id===b.dataset.more);if(!i)return;const card=b.closest(".issue-card"),m=document.createElement("div");m.className="more-menu";m.innerHTML=`${isAdmin()?'<button class="menu-edit">✎ Edit issue</button>':''}${isAdmin()?'<button class="menu-delete">Delete issue</button>':''}${!isAdmin()?'<div class="menu-note">View only</div>':''}`;card.appendChild(m);m.querySelector(".menu-edit")?.addEventListener("click",()=>openEdit(i));m.querySelector(".menu-delete")?.addEventListener("click",()=>openDelete("issues",i));});
+function openEdit(i){editTarget=i;$("editIssueTitle").value=i.title||"";$("editIssueCategory").value=i.category||"Other";$("editIssuePriority").value=i.priority||"Normal";setPickerValues(editPick.m,editPick.b,editPick.t,i.assignedTo);$("editIssueDueDate").value=i.dueDate||"";if(i.dueDate&&i.dueDate<today()){$("editIssueDueDate").removeAttribute("min");$("editDueHelp").textContent="Existing overdue date. Change it to today/future if rescheduling."}else{$("editIssueDueDate").min=today();$("editDueHelp").textContent="Today or a future date."}$("editIssueCost").value=Number(i.cost)||"";$("editIssueStatus").value=i.status||"Open";$("editIssueDescription").value=i.description||"";$("editModal").classList.remove("hidden")}
+$("editIssueForm").onsubmit=async e=>{e.preventDefault();const due=$("editIssueDueDate").value;if(due&&due<today()&&due!==(editTarget.dueDate||""))return alert("Due date cannot be in the past.");try{const st=$("editIssueStatus").value;await updateDoc(doc(db,"issues",editTarget.id),{title:$("editIssueTitle").value.trim(),category:$("editIssueCategory").value,priority:$("editIssuePriority").value,assignedTo:getPickerValues(editPick.m),dueDate:due,cost:Number($("editIssueCost").value)||0,status:st,description:$("editIssueDescription").value.trim(),completedAt:st==="Completed"?(editTarget.completedAt||new Date().toISOString()):null,updatedAt:new Date().toISOString(),updatedBy:currentUser.uid});closeModal("editModal");showToast("Issue updated");await loadIssues();renderAll()}catch(e){console.error(e);alert("Could not update the issue.")}};
+$("issueForm").onsubmit=async e=>{e.preventDefault();const due=$("issueDueDate").value;if(due&&due<today())return alert("Due date cannot be in the past.");try{await addDoc(collection(db,"issues"),{title:$("issueTitle").value.trim(),category:$("issueCategory").value,priority:$("issuePriority").value,assignedTo:getPickerValues(addPick.m),dueDate:due,cost:Number($("issueCost").value)||0,description:$("issueDescription").value.trim(),status:"Open",createdAt:new Date().toISOString(),createdBy:currentUser.uid});closeModal("issueModal");e.target.reset();setPickerValues(addPick.m,addPick.b,addPick.t,[]);showToast("Problem reported");await loadIssues();renderAll()}catch(e){console.error(e);alert("Could not report the problem.")}};
+function renderRecurring(){const t=today();const list=recurring.filter(x=>x.active!==false).sort((a,b)=>dateMs(a.nextDue)-dateMs(b.nextDue));$("recurringList").innerHTML=list.length?list.map(r=>{const overdue=r.nextDue&&r.nextDue<t;return `<article class="routine-card ${overdue?"routine-overdue":""}"><div class="routine-icon">${categoryIcons[r.category]||"↻"}</div><div class="routine-main"><div class="routine-title-row"><h3>${esc(r.title)}</h3><span class="frequency-badge">${frequencyLabel(r.frequency)}</span></div><div class="routine-meta"><span>📅 Next: <strong>${fmtDate(r.nextDue)}</strong>${overdue?' · Overdue':''}</span>${r.assignedTo?.length?`<span>👤 ${esc((Array.isArray(r.assignedTo)?r.assignedTo:[r.assignedTo]).join(" · "))}</span>`:""}<span>Typical: ${money(r.cost)}</span>${r.lastCompleted?`<span>✓ Last done ${fmtDate(r.lastCompleted)}</span>`:""}</div>${r.notes?`<p>${esc(r.notes)}</p>`:""}</div><div class="routine-actions">${isAdmin()?`<button class="done-button" data-complete-rec="${r.id}">✓ Mark done</button><button class="more-button" data-rec-more="${r.id}">•••</button>`:""}</div></article>`}).join(""):empty("No recurring tasks yet","Add regular jobs such as pool cleaning, gardening or AC servicing.")}
+function frequencyLabel(f){return {weekly:"Every week",fortnightly:"Twice a month",monthly:"Every month",quarterly:"Every 3 months","half-yearly":"Every 6 months",yearly:"Every year"}[f]||f}
+function recMonthly(r){const c=Number(r.cost||0);return {weekly:c*52/12,fortnightly:c*26/12,monthly:c,quarterly:c/3,"half-yearly":c/6,yearly:c/12}[r.frequency]||0}
+function billMonthly(b){const a=Number(b.amount||0);return {Monthly:a,Quarterly:a/3,Yearly:a/12,Other:0}[b.type]||0}
+$("recurringList").addEventListener("click",e=>{const d=e.target.closest("[data-complete-rec]");if(d){completeTarget=recurring.find(x=>x.id===d.dataset.completeRec);$("completeRecurringTitle").textContent=completeTarget.title;$("completionCost").value=Number(completeTarget.cost)||"";$("completionNotes").value="";$("completeRecurringModal").classList.remove("hidden");return}const m=e.target.closest("[data-rec-more]");if(m&&isAdmin()){document.querySelectorAll(".more-menu").forEach(x=>x.remove());const r=recurring.find(x=>x.id===m.dataset.recMore),menu=document.createElement("div");menu.className="more-menu";menu.innerHTML=`<button class="menu-delete">Delete task</button>`;m.closest(".routine-card").appendChild(menu);menu.querySelector("button").onclick=()=>openDelete("recurringTasks",r)}});
+$("recurringForm").onsubmit=async e=>{e.preventDefault();const d=$("recurringNextDue").value;if(d<today())return alert("Next due date cannot be in the past.");try{await addDoc(collection(db,"recurringTasks"),{title:$("recurringTitle").value.trim(),category:$("recurringCategory").value,frequency:$("recurringFrequency").value,nextDue:d,cost:Number($("recurringCost").value)||0,assignedTo:getPickerValues(recPick.m),notes:$("recurringNotes").value.trim(),active:true,createdAt:new Date().toISOString(),createdBy:currentUser.uid});closeModal("recurringModal");e.target.reset();setPickerValues(recPick.m,recPick.b,recPick.t,[]);showToast("Recurring task added");await loadRecurring();renderAll()}catch(e){console.error(e);alert("Could not add the recurring task.")}};
+$("completeRecurringForm").onsubmit=async e=>{e.preventDefault();try{const cost=Number($("completionCost").value)||0;const next=nextDate(completeTarget.nextDue,completeTarget.frequency);await updateDoc(doc(db,"recurringTasks",completeTarget.id),{lastCompleted:today(),lastCost:cost,nextDue:next,updatedAt:new Date().toISOString(),updatedBy:currentUser.uid});if(cost>0)await addDoc(collection(db,"expenses"),{title:completeTarget.title,amount:cost,date:today(),category:completeTarget.category||"Other",paidBy:"",notes:$("completionNotes").value.trim(),source:"Recurring task",sourceId:completeTarget.id,createdAt:new Date().toISOString(),createdBy:currentUser.uid});closeModal("completeRecurringModal");showToast("Completed ✓ · next date set");await loadRecurring();if(isAdmin())await loadExpenses();renderAll()}catch(e){console.error(e);alert("Could not record completion.")}};
+function nextDate(v,f){const d=new Date(`${v}T00:00:00`);if(f==="weekly")d.setDate(d.getDate()+7);else if(f==="fortnightly")d.setDate(d.getDate()+14);else if(f==="monthly")d.setMonth(d.getMonth()+1);else if(f==="quarterly")d.setMonth(d.getMonth()+3);else if(f==="half-yearly")d.setMonth(d.getMonth()+6);else d.setFullYear(d.getFullYear()+1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+function renderBills(){if(!isAdmin())return;const l=bills.sort((a,b)=>dateMs(a.nextDue)-dateMs(b.nextDue));$("billsList").innerHTML=l.length?l.map(b=>`<article class="data-card"><div><h3>${esc(b.title)}</h3><p>${esc(b.category||"")} · ${esc(b.type)} · Next due ${fmtDate(b.nextDue)}</p>${b.lastPaid?`<small class="paid-note">✓ Last paid ${fmtDate(b.lastPaid)}</small>`:""}</div><strong>${money(b.amount)}</strong><button class="paid-button" data-pay-bill="${b.id}">✓ Paid</button><button class="more-button" data-bill-more="${b.id}">•••</button></article>`).join(""):empty("No bills added","Add electricity, water, tax, insurance and other regular payments.")
+$("billsList").addEventListener("click",async e=>{const pay=e.target.closest("[data-pay-bill]");if(pay){const bill=bills.find(x=>x.id===pay.dataset.payBill);if(!bill)return;const amount=prompt(`Amount paid for ${bill.title}:`,String(bill.amount||0));if(amount===null)return;const n=Number(amount);if(!Number.isFinite(n)||n<0)return alert("Please enter a valid amount.");try{await addDoc(collection(db,"expenses"),{title:bill.title,amount:n,date:today(),category:bill.category||"Utilities",paidBy:"",notes:bill.notes||"",source:"Bill",sourceId:bill.id,createdAt:new Date().toISOString(),createdBy:currentUser.uid});await updateDoc(doc(db,"bills",bill.id),{lastPaid:today(),lastPaidAmount:n,nextDue:nextDate(bill.nextDue,bill.type==="Monthly"?"monthly":bill.type==="Quarterly"?"quarterly":bill.type==="Yearly"?"yearly":"monthly")});showToast("Bill marked paid ✓");await loadBills();await loadExpenses();renderAll();}catch(err){console.error(err);alert("Could not record the payment.")}return}const b=e.target.closest("[data-bill-more]");if(!b)return;const bill=bills.find(x=>x.id===b.dataset.billMore),m=document.createElement("div");m.className="more-menu";m.innerHTML='<button class="menu-delete">Delete bill</button>';b.parentElement.appendChild(m);m.querySelector("button").onclick=()=>openDelete("bills",bill)});
+$("billForm").onsubmit=async e=>{e.preventDefault();const d=$("billNextDue").value;if(d<today())return alert("Due date cannot be in the past.");try{await addDoc(collection(db,"bills"),{title:$("billTitle").value.trim(),type:$("billType").value,amount:Number($("billAmount").value)||0,nextDue:d,category:$("billCategory").value,notes:$("billNotes").value.trim(),createdAt:new Date().toISOString(),createdBy:currentUser.uid});closeModal("billModal");e.target.reset();showToast("Bill added");await loadBills();renderAll()}catch(e){console.error(e);alert("Could not add the bill.")}};
+function renderExpenses(){if(!isAdmin())return;const l=expenses.slice().sort((a,b)=>dateMs(b.date)-dateMs(a.date));$("expensesList").innerHTML=l.length?l.map(x=>`<article class="data-card"><div><h3>${esc(x.title)}</h3><p>${fmtDate(x.date)} · ${esc(x.category||"Other")}${x.paidBy?` · Paid by ${esc(x.paidBy)}`:""}</p></div><strong>${money(x.amount)}</strong><button class="more-button" data-exp-more="${x.id}">•••</button></article>`).join(""):empty("No expenses recorded","One-off repairs and recurring task costs will appear here.")}
+$("expensesList").addEventListener("click",e=>{const b=e.target.closest("[data-exp-more]");if(!b)return;const x=expenses.find(z=>z.id===b.dataset.expMore),m=document.createElement("div");m.className="more-menu";m.innerHTML='<button class="menu-delete">Delete expense</button>';b.parentElement.appendChild(m);m.querySelector("button").onclick=()=>openDelete("expenses",x)});
+$("expenseForm").onsubmit=async e=>{e.preventDefault();try{await addDoc(collection(db,"expenses"),{title:$("expenseTitle").value.trim(),date:$("expenseDate").value,amount:Number($("expenseAmount").value)||0,category:$("expenseCategory").value,paidBy:$("expensePaidBy").value.trim(),notes:$("expenseNotes").value.trim(),source:"One-off",createdAt:new Date().toISOString(),createdBy:currentUser.uid});closeModal("expenseModal");e.target.reset();showToast("Expense saved");await loadExpenses();renderAll()}catch(e){console.error(e);alert("Could not save the expense.")}};
+function openDelete(col,item){deleteTarget={col,item};$("deleteTarget").textContent=item?.title||"This record";$("deleteConfirmInput").value="";$("confirmDeleteBtn").disabled=true;$("deleteModal").classList.remove("hidden")}
+$("deleteConfirmInput").oninput=e=>$("confirmDeleteBtn").disabled=e.target.value!=="DELETE";$("confirmDeleteBtn").onclick=async()=>{if(!deleteTarget||$("deleteConfirmInput").value!=="DELETE")return;try{await deleteDoc(doc(db,deleteTarget.col,deleteTarget.item.id));closeModal("deleteModal");showToast("Record deleted");await loadAll()}catch(e){console.error(e);alert("Could not delete the record.")}};
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>closeModal(b.dataset.close));document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)closeModal(m.id)}));
+$("reportIssueBtn").onclick=()=>{navigate("issues");$("issueModal").classList.remove("hidden")};$("addIssueBtn").onclick=()=>$("issueModal").classList.remove("hidden");$("addRecurringBtn").onclick=()=>{$("recurringNextDue").min=today();$("recurringNextDue").value=today();$("recurringModal").classList.remove("hidden")};$("addBillBtn").onclick=()=>{$("billNextDue").min=today();$("billNextDue").value=today();$("billModal").classList.remove("hidden")};$("addExpenseBtn").onclick=()=>{$("expenseDate").max=today();$("expenseDate").value=today();$("expenseModal").classList.remove("hidden")};
+$("searchInput").oninput=renderIssues;$("statusFilter").onchange=renderIssues;$("priorityFilter").onchange=renderIssues;$("clearFiltersBtn").onclick=()=>{$("searchInput").value="";$('statusFilter').value="all";$('priorityFilter').value="all";renderIssues()};
+$("activeViewBtn").onclick=()=>{activeView="active";$("activeViewBtn").classList.add("active");$("historyViewBtn").classList.remove("active");$("statusFilter").value="all";renderIssues()};$("historyViewBtn").onclick=()=>{activeView="history";$("historyViewBtn").classList.add("active");$("activeViewBtn").classList.remove("active");$("statusFilter").value="all";renderIssues()};document.querySelectorAll("[data-status-shortcut]").forEach(b=>b.onclick=()=>{const v=b.dataset.statusShortcut;if(v==="overdue"){$("statusFilter").value="all";activeView="active"}else{$("statusFilter").value=v;activeView=v==="Completed"?"history":"active"}$("activeViewBtn").classList.toggle("active",activeView==="active");$("historyViewBtn").classList.toggle("active",activeView==="history");navigate("issues");renderIssues()});

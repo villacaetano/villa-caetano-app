@@ -1,298 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Villa Caetano property maintenance management">
-    <meta name="theme-color" content="#0f172a">
-    <title>Villa Caetano · Maintenance</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f172a"><meta name="description" content="Villa Caetano property maintenance management">
+<title>Villa Caetano · Property Management</title><link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- LOGIN -->
-    <div id="loginScreen" class="screen login-screen">
-        <div class="login-card">
-            <div class="login-logo-wrap"><img src="vcblack.png" class="login-logo" alt="Villa Caetano"></div>
-            <div class="eyebrow">PROPERTY MAINTENANCE</div>
-            <h1>Property Maintenance</h1>
-            <p class="subtitle">Keep the villa running beautifully.</p>
-            <button id="googleLoginBtn" class="google-button">
-                <span class="google-g">G</span>
-                <span>Continue with Google</span>
-            </button>
-            <p class="login-note">Private maintenance dashboard</p>
-        </div>
+<div id="loginScreen" class="screen login-screen">
+  <div class="login-card">
+    <div class="login-logo-wrap"><img src="vcblack.png" class="login-logo" alt="Villa Caetano"></div>
+    <div class="eyebrow">PROPERTY MANAGEMENT</div><h1>Welcome back</h1>
+    <p class="subtitle">Maintenance, bills and recurring tasks in one place.</p>
+    <button id="googleLoginBtn" class="google-button"><span class="google-g">G</span><span>Continue with Google</span></button>
+    <p class="login-note">Private Villa Caetano dashboard</p>
+  </div>
+</div>
+<div id="app" class="hidden">
+<header class="topbar">
+  <div class="brand"><img src="vcblack.png" class="brand-logo" alt="Villa Caetano"><div class="brand-copy"><strong>Villa Caetano</strong><span>Property management</span></div></div>
+  <div class="user-area"><span id="roleBadge" class="role-badge">Loading…</span><div class="user-avatar" id="userAvatar">VC</div><div class="user-details"><strong id="userName">User</strong><span id="userRoleText">Signed in</span></div><button id="logoutBtn" class="icon-button" title="Log out">↪</button></div>
+</header>
+<nav class="main-nav" aria-label="Main navigation">
+  <button class="nav-button active" data-section="dashboard">Dashboard</button>
+  <button class="nav-button" data-section="issues">Issues</button>
+  <button class="nav-button" data-section="recurring">Recurring tasks</button>
+  <button class="nav-button admin-only" data-section="bills">Bills</button>
+  <button class="nav-button admin-only" data-section="expenses">Expenses</button>
+</nav>
+<main class="container">
+<section id="dashboardSection" class="app-section">
+  <section class="hero"><div><div class="eyebrow">PROPERTY OVERVIEW</div><h1>Good morning<span class="hero-dot">.</span></h1><p>Everything that needs attention, in one simple view.</p></div><button id="reportIssueBtn" class="primary-button"><span>+</span> Report a problem</button></section>
+  <section class="stats">
+    <button class="stat-card stat-open" data-status-shortcut="Open"><span class="stat-icon">!</span><span class="stat-number" id="openCount">0</span><span class="stat-label">Open issues</span></button>
+    <button class="stat-card stat-progress" data-status-shortcut="In Progress"><span class="stat-icon">↗</span><span class="stat-number" id="progressCount">0</span><span class="stat-label">In progress</span></button>
+    <button class="stat-card stat-overdue" data-status-shortcut="overdue"><span class="stat-icon">◷</span><span class="stat-number" id="overdueCount">0</span><span class="stat-label">Overdue</span></button>
+    <button class="stat-card stat-completed" data-status-shortcut="Completed"><span class="stat-icon">✓</span><span class="stat-number" id="completedCount">0</span><span class="stat-label">Completed</span></button>
+  </section>
+  <section class="admin-finance admin-only">
+    <div class="section-heading"><div><h2>Money overview</h2><p>Actual spending and expected recurring costs</p></div></div>
+    <div class="finance-grid">
+      <div class="finance-card"><span>This month</span><strong id="monthSpend">₹0</strong><small>Recorded spending</small></div>
+      <div class="finance-card"><span>This year</span><strong id="yearSpend">₹0</strong><small>Recorded spending</small></div>
+      <div class="finance-card"><span>Monthly projection</span><strong id="monthlyProjection">₹0</strong><small>Recurring + regular bills</small></div>
+      <div class="finance-card"><span>Annual projection</span><strong id="annualProjection">₹0</strong><small>Expected recurring costs</small></div>
     </div>
-
-    <!-- APP -->
-    <div id="app" class="hidden">
-        <header class="topbar">
-            <div class="brand">
-                <img src="vcblack.png" class="brand-logo" alt="Villa Caetano">
-                <div>
-                    <strong>Villa Caetano</strong>
-                    <span>Maintenance</span>
-                </div>
-            </div>
-            <div class="user-area">
-                <div class="user-avatar" id="userAvatar">VC</div>
-                <div class="user-details">
-                    <strong id="userName">User</strong>
-                    <span>Signed in</span>
-                </div>
-                <button id="logoutBtn" class="icon-button" title="Log out" aria-label="Log out">↪</button>
-            </div>
-        </header>
-
-        <main class="container">
-            <section class="hero">
-                <div>
-                    <div class="eyebrow">PROPERTY OVERVIEW</div>
-                    <h1>Good morning<span class="hero-dot">.</span></h1>
-                    <p>Stay on top of every repair, task and maintenance job.</p>
-                </div>
-                <button id="addIssueBtn" class="primary-button"><span>+</span> Add issue</button>
-            </section>
-
-            <section class="stats" aria-label="Maintenance summary">
-                <button class="stat-card stat-open" data-status-shortcut="Open">
-                    <span class="stat-icon">!</span>
-                    <span class="stat-number" id="openCount">0</span>
-                    <span class="stat-label">Open</span>
-                </button>
-                <button class="stat-card stat-progress" data-status-shortcut="In Progress">
-                    <span class="stat-icon">↗</span>
-                    <span class="stat-number" id="progressCount">0</span>
-                    <span class="stat-label">In progress</span>
-                </button>
-                <button class="stat-card stat-overdue" data-status-shortcut="overdue">
-                    <span class="stat-icon">◷</span>
-                    <span class="stat-number" id="overdueCount">0</span>
-                    <span class="stat-label">Overdue</span>
-                </button>
-                <button class="stat-card stat-completed" data-status-shortcut="Completed">
-                    <span class="stat-icon">✓</span>
-                    <span class="stat-number" id="completedCount">0</span>
-                    <span class="stat-label">Completed</span>
-                </button>
-            </section>
-
-            <section class="toolbar">
-                <div class="search-wrap">
-                    <span>⌕</span>
-                    <input type="search" id="searchInput" placeholder="Search issues, categories or people…" autocomplete="off">
-                </div>
-                <select id="statusFilter" aria-label="Filter by status">
-                    <option value="all">All statuses</option>
-                    <option value="Open">Open</option>
-                    <option value="In Progress">In progress</option>
-                    <option value="Waiting">Waiting</option>
-                    <option value="Completed">Completed</option>
-                </select>
-                <select id="priorityFilter" aria-label="Filter by priority">
-                    <option value="all">All priorities</option>
-                    <option value="Urgent">Urgent</option>
-                    <option value="High">High</option>
-                    <option value="Normal">Normal</option>
-                    <option value="Low">Low</option>
-                </select>
-                <button id="clearFiltersBtn" class="clear-button hidden">Clear</button>
-            </section>
-
-            <section>
-                <div class="section-heading">
-                    <div>
-                        <h2>Maintenance issues</h2>
-                        <p id="issueCount">0 issues</p>
-                    </div>
-                    <div class="section-actions">
-                        <button id="activeViewBtn" class="view-button active">Active</button>
-                        <button id="historyViewBtn" class="view-button">History</button>
-                    </div>
-                </div>
-                <div id="issuesList"></div>
-            </section>
-        </main>
-    </div>
-
-    <!-- ADD ISSUE MODAL -->
-    <div id="issueModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="issueModalTitle">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div>
-                    <div class="eyebrow">NEW TASK</div>
-                    <h2 id="issueModalTitle">Add maintenance issue</h2>
-                </div>
-                <button id="closeModalBtn" class="close-button" aria-label="Close">×</button>
-            </div>
-            <form id="issueForm">
-                <div class="form-grid">
-                    <label class="full">
-                        Issue title
-                        <input type="text" id="issueTitle" placeholder="e.g. Pool pump making noise" required>
-                    </label>
-                    <label>
-                        Category
-                        <select id="issueCategory" required>
-                            <option value="">Select category</option>
-                            <option>Pool</option><option>Garden</option><option>Electrical</option>
-                            <option>Plumbing</option><option>Air Conditioning</option><option>Building</option>
-                            <option>Security</option><option>Cleaning</option><option>Furniture</option>
-                            <option>Appliances</option><option>Other</option>
-                        </select>
-                    </label>
-                    <label>
-                        Priority
-                        <select id="issuePriority">
-                            <option>Normal</option><option>Low</option><option>High</option><option>Urgent</option>
-                        </select>
-                    </label>
-                    <label class="full">
-                        Who should handle this?
-                        <div class="multi-select" id="assignedPicker">
-                            <button type="button" class="multi-select-button" id="assignedButton">
-                                <span id="assignedButtonText">Select people / teams</span><span>⌄</span>
-                            </button>
-                            <div class="multi-select-menu hidden" id="assignedMenu">
-                                <label><input type="checkbox" value="Owner"> <span>Owner</span></label>
-                                <label><input type="checkbox" value="Caretaker"> <span>Caretaker</span></label>
-                                <label><input type="checkbox" value="Contractor"> <span>Contractor</span></label>
-                                <label><input type="checkbox" value="Property Management"> <span>Property Management</span></label>
-                                <label><input type="checkbox" value="Electrician"> <span>Electrician</span></label>
-                                <label><input type="checkbox" value="Plumber"> <span>Plumber</span></label>
-                                <label><input type="checkbox" value="Pool / Garden"> <span>Pool / Garden</span></label>
-                                <label><input type="checkbox" value="Other"> <span>Other</span></label>
-                                <input type="text" id="assignedOther" class="assigned-other" placeholder="Optional: type a name / company">
-                                <button type="button" class="done-select-button" id="assignedDoneBtn">Done</button>
-                            </div>
-                        </div>
-                        <small class="field-help">You can select more than one.</small>
-                    </label>
-                    <label>
-                        Due date
-                        <input type="date" id="issueDueDate">
-                        <small class="field-help">Choose today or a future date.</small>
-                    </label>
-                    <label>
-                        Estimated / actual cost
-                        <input type="number" id="issueCost" placeholder="₹ 0" min="0" step="0.01">
-                    </label>
-                    <label class="full">
-                        Description / notes
-                        <textarea id="issueDescription" rows="4" placeholder="Describe the problem or work required…"></textarea>
-                    </label>
-                </div>
-                <div class="form-actions">
-                    <button type="button" id="cancelIssueBtn" class="secondary-button">Cancel</button>
-                    <button type="submit" class="primary-button">Create issue</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- EDIT ISSUE MODAL -->
-    <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div>
-                    <div class="eyebrow">UPDATE TASK</div>
-                    <h2 id="editModalTitle">Edit maintenance issue</h2>
-                </div>
-                <button id="closeEditModalBtn" class="close-button" aria-label="Close">×</button>
-            </div>
-            <form id="editIssueForm">
-                <div class="form-grid">
-                    <label class="full">
-                        Issue title
-                        <input type="text" id="editIssueTitle" required>
-                    </label>
-                    <label>
-                        Category
-                        <select id="editIssueCategory" required>
-                            <option value="">Select category</option>
-                            <option>Pool</option><option>Garden</option><option>Electrical</option>
-                            <option>Plumbing</option><option>Air Conditioning</option><option>Building</option>
-                            <option>Security</option><option>Cleaning</option><option>Furniture</option>
-                            <option>Appliances</option><option>Other</option>
-                        </select>
-                    </label>
-                    <label>
-                        Priority
-                        <select id="editIssuePriority">
-                            <option>Normal</option><option>Low</option><option>High</option><option>Urgent</option>
-                        </select>
-                    </label>
-                    <label class="full">
-                        Who should handle this?
-                        <div class="multi-select" id="editAssignedPicker">
-                            <button type="button" class="multi-select-button" id="editAssignedButton">
-                                <span id="editAssignedButtonText">Select people / teams</span><span>⌄</span>
-                            </button>
-                            <div class="multi-select-menu hidden" id="editAssignedMenu">
-                                <label><input type="checkbox" value="Owner"> <span>Owner</span></label>
-                                <label><input type="checkbox" value="Caretaker"> <span>Caretaker</span></label>
-                                <label><input type="checkbox" value="Contractor"> <span>Contractor</span></label>
-                                <label><input type="checkbox" value="Property Management"> <span>Property Management</span></label>
-                                <label><input type="checkbox" value="Electrician"> <span>Electrician</span></label>
-                                <label><input type="checkbox" value="Plumber"> <span>Plumber</span></label>
-                                <label><input type="checkbox" value="Pool / Garden"> <span>Pool / Garden</span></label>
-                                <label><input type="checkbox" value="Other"> <span>Other</span></label>
-                                <input type="text" id="editAssignedOther" class="assigned-other" placeholder="Optional: type a name / company">
-                                <button type="button" class="done-select-button" id="editAssignedDoneBtn">Done</button>
-                            </div>
-                        </div>
-                        <small class="field-help">You can select more than one.</small>
-                    </label>
-                    <label>
-                        Due date
-                        <input type="date" id="editIssueDueDate">
-                        <small class="field-help" id="editDueHelp">Choose today or a future date.</small>
-                    </label>
-                    <label>
-                        Estimated / actual cost
-                        <input type="number" id="editIssueCost" min="0" step="0.01">
-                    </label>
-                    <label>
-                        Status
-                        <select id="editIssueStatus">
-                            <option>Open</option><option>In Progress</option><option>Waiting</option><option>Completed</option>
-                        </select>
-                    </label>
-                    <label class="full">
-                        Description / notes
-                        <textarea id="editIssueDescription" rows="4" placeholder="Describe the problem or work required…"></textarea>
-                    </label>
-                </div>
-                <div class="form-actions">
-                    <button type="button" id="cancelEditBtn" class="secondary-button">Cancel</button>
-                    <button type="submit" class="primary-button">Save changes</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- DELETE CONFIRMATION -->
-    <div id="deleteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
-        <div class="modal-card delete-card">
-            <div class="danger-mark">!</div>
-            <div class="eyebrow danger-text">PERMANENT ACTION</div>
-            <h2 id="deleteModalTitle">Delete this issue?</h2>
-            <p>This will permanently remove the maintenance record. This action cannot be undone.</p>
-            <div class="delete-target" id="deleteTarget"></div>
-            <label class="delete-confirm-label">
-                Type <strong>DELETE</strong> to confirm
-                <input type="text" id="deleteConfirmInput" autocomplete="off" placeholder="Type DELETE">
-            </label>
-            <div class="form-actions">
-                <button type="button" id="cancelDeleteBtn" class="secondary-button">Cancel</button>
-                <button type="button" id="confirmDeleteBtn" class="danger-button" disabled>Delete permanently</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="toast" class="toast hidden"></div>
-
-    <script type="module" src="firebase.js"></script>
-    <script type="module" src="app.js"></script>
-</body>
-</html>
+  </section>
+  <section class="quick-section">
+    <div class="section-heading"><div><h2>Next up</h2><p>Things coming due soon</p></div><button class="text-button" data-section-link="recurring">View recurring tasks →</button></div>
+    <div id="dashboardNext"></div>
+  </section>
+</section>
+<section id="issuesSection" class="app-section hidden">
+  <div class="page-heading"><div><div class="eyebrow">MAINTENANCE</div><h1>Issues</h1><p>Report, track and close problems around the property.</p></div><button id="addIssueBtn" class="primary-button"><span>+</span> Report a problem</button></div>
+  <section class="toolbar"><div class="search-wrap"><span>⌕</span><input type="search" id="searchInput" placeholder="Search problems, categories or people…"></div><select id="statusFilter"><option value="all">All statuses</option><option>Open</option><option>In Progress</option><option>Waiting</option><option>Completed</option></select><select id="priorityFilter"><option value="all">All priorities</option><option>Urgent</option><option>High</option><option>Normal</option><option>Low</option></select><button id="clearFiltersBtn" class="clear-button hidden">Clear</button></section>
+  <div class="section-heading"><div><h2>Maintenance issues</h2><p id="issueCount">0 issues</p></div><div class="section-actions"><button id="activeViewBtn" class="view-button active">Active</button><button id="historyViewBtn" class="view-button">History</button></div></div>
+  <div id="issuesList"></div>
+</section>
+<section id="recurringSection" class="app-section hidden">
+  <div class="page-heading"><div><div class="eyebrow">ROUTINE CARE</div><h1>Recurring tasks</h1><p>Regular jobs such as cleaning, gardening and servicing.</p></div><button id="addRecurringBtn" class="primary-button admin-only"><span>+</span> Add recurring task</button></div>
+  <div class="info-banner"><strong>How it works</strong><span>When a task is done, record the cost. The next due date is created automatically.</span></div>
+  <div id="recurringList"></div>
+</section>
+<section id="billsSection" class="app-section hidden admin-only">
+  <div class="page-heading"><div><div class="eyebrow">REGULAR PAYMENTS</div><h1>Bills</h1><p>Monthly, yearly and other recurring property bills.</p></div><button id="addBillBtn" class="primary-button"><span>+</span> Add bill</button></div>
+  <div class="bill-summary"><div><span>Monthly bills</span><strong id="monthlyBillsTotal">₹0</strong></div><div><span>Yearly bills</span><strong id="yearlyBillsTotal">₹0</strong></div></div>
+  <div id="billsList"></div>
+</section>
+<section id="expensesSection" class="app-section hidden admin-only">
+  <div class="page-heading"><div><div class="eyebrow">MONEY OUT</div><h1>Expenses</h1><p>One-off costs and recorded payments.</p></div><button id="addExpenseBtn" class="primary-button"><span>+</span> Add expense</button></div>
+  <div id="expensesList"></div>
+</section>
+</main></div>
+<!-- ISSUE MODAL -->
+<div id="issueModal" class="modal hidden"><div class="modal-card"><div class="modal-header"><div><div class="eyebrow">NEW PROBLEM</div><h2>Report a problem</h2></div><button class="close-button" data-close="issueModal">×</button></div><form id="issueForm"><div class="form-grid">
+<label class="full">What's wrong?<input id="issueTitle" required placeholder="e.g. Pool pump making noise"></label>
+<label>Where is it?<select id="issueCategory" required><option value="">Choose an area</option><option>Pool</option><option>Garden</option><option>Electrical</option><option>Plumbing</option><option>Air Conditioning</option><option>Building</option><option>Security</option><option>Cleaning</option><option>Furniture</option><option>Appliances</option><option>Other</option></select></label>
+<label>How serious is it?<select id="issuePriority"><option>Normal</option><option>Low</option><option>High</option><option>Urgent</option></select></label>
+<label class="full">Who should handle this?<div class="multi-select"><button type="button" class="multi-select-button" id="assignedButton"><span id="assignedButtonText">Select people / teams</span><span>⌄</span></button><div class="multi-select-menu hidden" id="assignedMenu"></div></div><small class="field-help">You can choose more than one.</small></label>
+<label>When should it be done?<input type="date" id="issueDueDate"><small class="field-help">Today or a future date.</small></label>
+<label>Cost (if known)<input type="number" id="issueCost" min="0" step="0.01" placeholder="₹ 0"></label>
+<label class="full">Anything else?<textarea id="issueDescription" rows="4" placeholder="Add useful details…"></textarea></label>
+</div><div class="form-actions"><button type="button" class="secondary-button" data-close="issueModal">Cancel</button><button class="primary-button" type="submit">Report problem</button></div></form></div></div>
+<!-- EDIT ISSUE -->
+<div id="editModal" class="modal hidden"><div class="modal-card"><div class="modal-header"><div><div class="eyebrow">UPDATE</div><h2>Edit issue</h2></div><button class="close-button" data-close="editModal">×</button></div><form id="editIssueForm"><div class="form-grid">
+<label class="full">What's wrong?<input id="editIssueTitle" required></label><label>Where is it?<select id="editIssueCategory" required><option>Pool</option><option>Garden</option><option>Electrical</option><option>Plumbing</option><option>Air Conditioning</option><option>Building</option><option>Security</option><option>Cleaning</option><option>Furniture</option><option>Appliances</option><option>Other</option></select></label><label>Priority<select id="editIssuePriority"><option>Normal</option><option>Low</option><option>High</option><option>Urgent</option></select></label>
+<label class="full">Who should handle this?<div class="multi-select"><button type="button" class="multi-select-button" id="editAssignedButton"><span id="editAssignedButtonText">Select people / teams</span><span>⌄</span></button><div class="multi-select-menu hidden" id="editAssignedMenu"></div></div></label>
+<label>Due date<input type="date" id="editIssueDueDate"><small class="field-help" id="editDueHelp">Today or a future date.</small></label><label>Cost<input type="number" id="editIssueCost" min="0" step="0.01"></label><label>Status<select id="editIssueStatus"><option>Open</option><option>In Progress</option><option>Waiting</option><option>Completed</option></select></label><label class="full">Notes<textarea id="editIssueDescription" rows="4"></textarea></label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="editModal">Cancel</button><button class="primary-button" type="submit">Save changes</button></div></form></div></div>
+<!-- RECURRING MODAL -->
+<div id="recurringModal" class="modal hidden"><div class="modal-card"><div class="modal-header"><div><div class="eyebrow">ROUTINE CARE</div><h2>Add recurring task</h2></div><button class="close-button" data-close="recurringModal">×</button></div><form id="recurringForm"><div class="form-grid"><label class="full">What needs doing?<input id="recurringTitle" required placeholder="e.g. Pool cleaning"></label><label>Category<select id="recurringCategory"><option>Pool</option><option>Garden</option><option>Air Conditioning</option><option>Cleaning</option><option>Building</option><option>Security</option><option>Other</option></select></label><label>How often?<select id="recurringFrequency"><option value="weekly">Every week</option><option value="fortnightly">Twice a month</option><option value="monthly">Every month</option><option value="quarterly">Every 3 months</option><option value="half-yearly">Every 6 months</option><option value="yearly">Every year</option></select></label><label>Next due date<input type="date" id="recurringNextDue" required></label><label>Usual cost<input type="number" id="recurringCost" min="0" step="0.01" placeholder="₹ 0"></label><label class="full">Who handles it?<div class="multi-select"><button type="button" class="multi-select-button" id="recurringAssignedButton"><span id="recurringAssignedButtonText">Select people / teams</span><span>⌄</span></button><div class="multi-select-menu hidden" id="recurringAssignedMenu"></div></div></label><label class="full">Notes<textarea id="recurringNotes" rows="3" placeholder="Optional details…"></textarea></label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="recurringModal">Cancel</button><button class="primary-button" type="submit">Create recurring task</button></div></form></div></div>
+<!-- COMPLETE RECURRING -->
+<div id="completeRecurringModal" class="modal hidden"><div class="modal-card small-modal"><div class="modal-header"><div><div class="eyebrow">TASK COMPLETE</div><h2>Record completion</h2></div><button class="close-button" data-close="completeRecurringModal">×</button></div><p class="modal-copy" id="completeRecurringTitle"></p><form id="completeRecurringForm"><label>What did it cost?<input type="number" id="completionCost" min="0" step="0.01" placeholder="₹ 0"></label><label>Notes<textarea id="completionNotes" rows="3" placeholder="Optional…"></textarea></label><div class="form-actions"><button type="button" class="secondary-button" data-close="completeRecurringModal">Cancel</button><button class="primary-button" type="submit">Save & set next date</button></div></form></div></div>
+<!-- BILL -->
+<div id="billModal" class="modal hidden"><div class="modal-card"><div class="modal-header"><div><div class="eyebrow">REGULAR PAYMENT</div><h2>Add bill</h2></div><button class="close-button" data-close="billModal">×</button></div><form id="billForm"><div class="form-grid"><label class="full">Bill name<input id="billTitle" required placeholder="e.g. Electricity"></label><label>Type<select id="billType"><option>Monthly</option><option>Yearly</option><option>Quarterly</option><option>Other</option></select></label><label>Typical amount<input type="number" id="billAmount" min="0" step="0.01" placeholder="₹ 0" required></label><label>Next due date<input type="date" id="billNextDue" required></label><label>Category<select id="billCategory"><option>Electricity</option><option>Water</option><option>Internet</option><option>Property tax</option><option>Insurance</option><option>Gas</option><option>Waste</option><option>Other</option></select></label><label class="full">Notes<textarea id="billNotes" rows="3" placeholder="Account/reference or useful notes…"></textarea></label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="billModal">Cancel</button><button class="primary-button" type="submit">Add bill</button></div></form></div></div>
+<!-- EXPENSE -->
+<div id="expenseModal" class="modal hidden"><div class="modal-card"><div class="modal-header"><div><div class="eyebrow">ONE-OFF COST</div><h2>Add expense</h2></div><button class="close-button" data-close="expenseModal">×</button></div><form id="expenseForm"><div class="form-grid"><label class="full">What was paid for?<input id="expenseTitle" required placeholder="e.g. Replace broken tile"></label><label>Date<input type="date" id="expenseDate" required></label><label>Amount<input type="number" id="expenseAmount" min="0" step="0.01" required placeholder="₹ 0"></label><label>Category<select id="expenseCategory"><option>Repairs</option><option>Garden</option><option>Pool</option><option>Utilities</option><option>Furniture</option><option>Appliances</option><option>Cleaning</option><option>Other</option></select></label><label>Paid by<input id="expensePaidBy" placeholder="e.g. Owner / Caretaker"></label><label class="full">Notes<textarea id="expenseNotes" rows="3"></textarea></label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="expenseModal">Cancel</button><button class="primary-button" type="submit">Save expense</button></div></form></div></div>
+<!-- DELETE -->
+<div id="deleteModal" class="modal hidden"><div class="modal-card delete-card"><div class="danger-mark">!</div><div class="eyebrow danger-text">PERMANENT ACTION</div><h2>Delete this record?</h2><p>This permanently removes the record.</p><div class="delete-target" id="deleteTarget"></div><label class="delete-confirm-label">Type <strong>DELETE</strong> to confirm<input id="deleteConfirmInput" placeholder="Type DELETE" autocomplete="off"></label><div class="form-actions"><button class="secondary-button" data-close="deleteModal">Cancel</button><button id="confirmDeleteBtn" class="danger-button" disabled>Delete permanently</button></div></div></div>
+<div id="toast" class="toast hidden"></div>
+<script type="module" src="firebase.js"></script><script type="module" src="app.js"></script>
+</body></html>
