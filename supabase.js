@@ -4,6 +4,6 @@
   Never put a service_role/secret key in this file.
 */
 window.SUPABASE_CONFIG = {
-  url: "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE",
-  publishableKey: "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE"
+  url: "https://xrbzihjymjahzucnkgcb.supabase.co",
+  publishableKey: "sb_publishable_bVUGU3ov93IehLv4bMWfMA_OX_3a3Jq"
 };
