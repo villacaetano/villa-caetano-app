@@ -11,17 +11,6 @@ function dateMs(v){const n=Date.parse(v||"");return Number.isFinite(n)?n:0};
 function showToast(m){const t=$("toast");if(!t)return;t.textContent=m;t.classList.remove("hidden");clearTimeout(showToast.t);showToast.t=setTimeout(()=>t.classList.add("hidden"),2400)}
 function closeModal(id){if($(id))$(id).classList.add("hidden");}
 
-// Keep Google login available even if a later UI enhancement has an error.
-const loginButton=$("googleLoginBtn");
-if(loginButton){loginButton.addEventListener("click",async()=>{
-  loginButton.disabled=true;
-  const label=loginButton.querySelector("span:last-child");
-  if(label)label.textContent="Signing in…";
-  try{await signInWithPopup(auth,provider);}
-  catch(e){console.error("Google sign-in error:",e);alert(`Login failed: ${e.code||e.message||"Please try again."}`);}
-  finally{loginButton.disabled=false;if(label)label.textContent="Continue with Google";}
-});}
-
 function setMinDates(){["issueDueDate","editIssueDueDate","recurringNextDue","billNextDue","expenseDate"].forEach(id=>{if($(id))$(id).min=today()})}
 function populateAssigneeMenus(){["assignedMenu","editAssignedMenu","recurringAssignedMenu"].forEach(id=>{const m=$(id);m.innerHTML=ASSIGNEES.map(x=>`<label><input type="checkbox" value="${esc(x)}"><span>${esc(x)}</span></label>`).join("")+`<input class="assigned-other" placeholder="Optional name / company"><button type="button" class="done-select-button">Done</button>`;});}
 function picker(menuId,buttonId,textId){const m=$(menuId),b=$(buttonId),t=$(textId);b.onclick=e=>{e.stopPropagation();document.querySelectorAll(".multi-select-menu").forEach(x=>x.classList.add("hidden"));m.classList.toggle("hidden")};m.addEventListener("click",e=>e.stopPropagation());m.querySelector(".done-select-button").onclick=()=>m.classList.add("hidden");m.addEventListener("change",()=>updatePicker(m,t,b));m.querySelector(".assigned-other").addEventListener("input",()=>updatePicker(m,t,b));return {m,b,t}}
