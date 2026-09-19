@@ -42,3 +42,12 @@ In Google Cloud Console, the OAuth redirect URI must be the Supabase callback UR
 
 LOGIN METHOD
 This version uses native Supabase Email/Password authentication. Do not configure Google OAuth. Invite users from Supabase Dashboard -> Authentication -> Users -> Add user -> Send invitation. The invited user sets a password from the invitation email and then signs into the app with their email and password.
+
+
+PASSWORD / INVITATION FLOW
+- The app now handles Supabase invite links and password-reset links.
+- Add the production app URL to Supabase Auth -> URL Configuration -> Redirect URLs:
+  https://villacaetano.com/villa-caetano-app/
+- When an invited user clicks the invitation, they are returned to the app and shown a Set your password screen.
+- When Forgot password is used, the reset link returns to the app and shows the same password form.
+- Do not put the Supabase secret/service-role key in the browser.

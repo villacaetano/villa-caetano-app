@@ -75,6 +75,29 @@
 <div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h2 id="modalTitle">Add</h2><button id="closeModal" class="icon-button">×</button></div><div id="modalBody"></div></div></div>
 <div id="toast" class="toast"></div>
 
+<div id="passwordSetupModal" class="modal hidden">
+  <div class="modal-card small-modal">
+    <div class="modal-head">
+      <h2 id="passwordSetupTitle">Set your password</h2>
+    </div>
+    <div class="password-setup-content">
+      <p id="passwordSetupText" class="muted">Create a password to finish setting up your Villa Caetano account.</p>
+      <form id="passwordSetupForm">
+        <label>New password
+          <input id="newPassword" type="password" minlength="8" autocomplete="new-password" required placeholder="At least 8 characters">
+        </label>
+        <label>Confirm password
+          <input id="confirmPassword" type="password" minlength="8" autocomplete="new-password" required placeholder="Repeat your password">
+        </label>
+        <small id="passwordSetupError" class="error-text"></small>
+        <div class="form-actions">
+          <button class="primary" type="submit" id="passwordSetupBtn">Set password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
 <script src="app.js"></script>

@@ -16,12 +16,28 @@ document.addEventListener('click', e=>{
   const go=e.target.closest('[data-go]'); if(go) showTab(go.dataset.go);
 });
 
+function authFlowType(){
+  const hash=new URLSearchParams(window.location.hash.replace(/^#/,''));
+  const query=new URLSearchParams(window.location.search);
+  return hash.get('type') || query.get('type') || '';
+}
+function clearAuthUrl(){
+  try{ window.history.replaceState({},document.title,window.location.pathname+window.location.search); }catch(_e){}
+}
+
 async function boot(){
   if(!sb){ $('loginError').textContent='Supabase could not be initialized. Check supabase.js.'; return; }
   const {data:{session:s},error:e}=await sb.auth.getSession();
   if(e){ console.error(e); $('loginError').textContent=e.message; }
   await handleSession(s);
-  sb.auth.onAuthStateChange(async (_e,s)=>{ await handleSession(s); });
+  const flow=authFlowType();
+  if(s && (flow==='invite' || flow==='recovery')) showPasswordSetup(flow);
+  sb.auth.onAuthStateChange(async (event,s)=>{
+    await handleSession(s);
+    if(event==='PASSWORD_RECOVERY' || authFlowType()==='recovery' || authFlowType()==='invite'){
+      if(s) showPasswordSetup(authFlowType()|| (event==='PASSWORD_RECOVERY'?'recovery':''));
+    }
+  });
 }
 async function handleSession(s){
   session=s;
@@ -65,6 +81,45 @@ $('loginForm').onsubmit=async(e)=>{
     btn.disabled=false;
     btn.textContent='Sign in';
     loginBusy=false;
+  }
+};
+
+let passwordSetupBusy=false;
+function showPasswordSetup(flow){
+  const modal=$('passwordSetupModal');
+  if(!modal)return;
+  $('passwordSetupTitle').textContent=flow==='invite'?'Finish setting up your account':'Set a new password';
+  $('passwordSetupText').textContent=flow==='invite'
+    ? 'Welcome to Villa Caetano. Create a password to finish accepting your invitation.'
+    : 'Create a new password for your Villa Caetano account.';
+  $('passwordSetupError').textContent='';
+  $('newPassword').value='';
+  $('confirmPassword').value='';
+  modal.classList.remove('hidden');
+  setTimeout(()=>$('newPassword').focus(),50);
+}
+
+$('passwordSetupForm').onsubmit=async(e)=>{
+  e.preventDefault();
+  if(passwordSetupBusy)return;
+  const p1=$('newPassword').value;
+  const p2=$('confirmPassword').value;
+  $('passwordSetupError').textContent='';
+  if(p1.length<8){ $('passwordSetupError').textContent='Password must be at least 8 characters.'; return; }
+  if(p1!==p2){ $('passwordSetupError').textContent='The passwords do not match.'; return; }
+  passwordSetupBusy=true;
+  const btn=$('passwordSetupBtn'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    const {error:e}=await sb.auth.updateUser({password:p1});
+    if(e)throw e;
+    $('passwordSetupModal').classList.add('hidden');
+    clearAuthUrl();
+    toast('Password set successfully. Welcome to Villa Caetano.');
+  }catch(e){
+    console.error('Password setup error:',e);
+    $('passwordSetupError').textContent=e?.message||'Could not set password.';
+  }finally{
+    passwordSetupBusy=false; btn.disabled=false; btn.textContent='Set password';
   }
 };
 
