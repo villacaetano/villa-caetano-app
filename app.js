@@ -6,6 +6,7 @@ import {
 let currentUser = null;
 let issues = [];
 let deleteTargetIssue = null;
+let editTargetIssue = null;
 let activeView = "active";
 
 const $ = id => document.getElementById(id);
@@ -20,6 +21,7 @@ const clearFiltersBtn = $("clearFiltersBtn");
 const activeViewBtn = $("activeViewBtn"), historyViewBtn = $("historyViewBtn");
 const deleteModal = $("deleteModal"), deleteConfirmInput = $("deleteConfirmInput");
 const confirmDeleteBtn = $("confirmDeleteBtn"), cancelDeleteBtn = $("cancelDeleteBtn");
+const editModal = $("editModal"), editIssueForm = $("editIssueForm");
 
 const categoryIcons = {
     Pool:"◉", Garden:"✦", Electrical:"⚡", Plumbing:"⌁",
@@ -117,31 +119,34 @@ function renderIssues() {
     let filtered = issues.filter(issue => {
         const matchesSearch = [issue.title, issue.description, issue.category, issue.assignedTo]
             .some(v => String(v || "").toLowerCase().includes(search));
-        const matchesStatus = status === "all" || issue.status === status;
         const matchesPriority = priority === "all" || issue.priority === priority;
         const isOverdue = issue.status !== "Completed" && issue.dueDate && issue.dueDate < today;
 
-        const matchesView = activeView === "history"
-            ? issue.status === "Completed"
-            : issue.status !== "Completed";
+        // Explicit status selection overrides Active/History.
+        // This means selecting "Completed" always shows completed records,
+        // even if the History tab is not selected.
+        const matchesStatus = status === "all" || issue.status === status;
+        const viewMatches = status !== "all"
+            ? true
+            : (activeView === "history" ? issue.status === "Completed" : issue.status !== "Completed");
 
-        return matchesSearch && matchesStatus && matchesPriority && matchesView;
+        return matchesSearch && matchesStatus && matchesPriority && viewMatches;
     });
 
-    // Put overdue and urgent active work first; completed history stays newest-first.
     filtered.sort((a,b) => {
-        if (activeView === "history") return dateValue(b.createdAt) - dateValue(a.createdAt);
-        const score = issueRank(b) - issueRank(a);
-        return score || (dateValue(b.createdAt) - dateValue(a.createdAt));
+        if (activeView === "history" || status === "Completed") {
+            return dateValue(b.completedAt || b.createdAt) - dateValue(a.completedAt || a.createdAt);
+        }
+        return (issueRank(b) - issueRank(a)) || (dateValue(b.createdAt) - dateValue(a.createdAt));
     });
 
     issuesList.innerHTML = "";
     if (!filtered.length) {
         issuesList.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon">${activeView === "history" ? "✓" : "◌"}</div>
-                <h3>${activeView === "history" ? "No completed issues" : "Nothing needs attention"}</h3>
-                <p>${activeView === "history" ? "Completed maintenance will appear here." : "You're all caught up, or nothing matches your filters."}</p>
+                <div class="empty-icon">${activeView === "history" || status === "Completed" ? "✓" : "◌"}</div>
+                <h3>${activeView === "history" || status === "Completed" ? "No completed issues" : "Nothing needs attention"}</h3>
+                <p>${activeView === "history" || status === "Completed" ? "Completed maintenance will appear here." : "You're all caught up, or nothing matches your filters."}</p>
             </div>`;
     } else {
         filtered.forEach(issue => issuesList.appendChild(createIssueCard(issue)));
@@ -163,11 +168,12 @@ function createIssueCard(issue) {
     const completed = issue.status === "Completed";
     const overdue = !completed && issue.dueDate && issue.dueDate < localDateString();
     const priorityClass = `priority-${safeClass(issue.priority)}`;
-    card.className = `issue-card ${priorityClass} ${completed ? "completed" : ""}`;
+    card.className = `issue-card ${priorityClass} ${completed ? "completed" : ""} ${overdue ? "overdue-card" : ""}`;
 
     const dueText = issue.dueDate ? formatDate(issue.dueDate) : "";
     const costText = Number(issue.cost) ? `₹${Number(issue.cost).toLocaleString("en-IN", {maximumFractionDigits:2})}` : "";
     const icon = categoryIcons[issue.category] || "•";
+    const categoryClass = `category-${safeClass(issue.category)}`;
 
     card.innerHTML = `
         <div class="issue-main">
@@ -178,12 +184,13 @@ function createIssueCard(issue) {
                 </div>
                 ${issue.description ? `<div class="issue-description">${escapeHtml(issue.description)}</div>` : ""}
                 <div class="issue-meta">
-                    <span class="badge">${icon} ${escapeHtml(issue.category || "Other")}</span>
+                    <span class="badge ${categoryClass}">${icon} ${escapeHtml(issue.category || "Other")}</span>
                     <span class="badge priority-${safeClass(issue.priority)}">${escapeHtml(issue.priority || "Normal")}</span>
                     <span class="badge status-${safeClass(issue.status)}">${completed ? "✓ Done" : escapeHtml(issue.status || "Open")}</span>
                     ${issue.assignedTo ? `<span class="badge">👤 ${escapeHtml(issue.assignedTo)}</span>` : ""}
                     ${dueText ? `<span class="badge ${overdue ? "overdue" : ""}">${overdue ? "⚠ " : "📅 "}${escapeHtml(dueText)}${overdue ? " · Overdue" : ""}</span>` : ""}
                     ${costText ? `<span class="badge">₹ ${costText.replace("₹","")}</span>` : ""}
+                    ${completed && issue.completedAt ? `<span class="badge">✓ ${escapeHtml(formatDateTime(issue.completedAt))}</span>` : ""}
                 </div>
             </div>
             <div class="issue-actions">
@@ -193,7 +200,7 @@ function createIssueCard(issue) {
                     <option ${issue.status === "Waiting" ? "selected" : ""}>Waiting</option>
                     <option ${issue.status === "Completed" ? "selected" : ""}>Completed</option>
                 </select>
-                <button class="delete-button" title="Delete issue" aria-label="Delete issue">⌫</button>
+                <button class="more-button" title="More actions" aria-label="More actions">•••</button>
             </div>
         </div>`;
 
@@ -212,7 +219,26 @@ function createIssueCard(issue) {
         }
     });
 
-    card.querySelector(".delete-button").addEventListener("click", () => openDeleteModal(issue));
+    const moreButton = card.querySelector(".more-button");
+    moreButton.addEventListener("click", e => {
+        e.stopPropagation();
+        document.querySelectorAll(".more-menu").forEach(m => m.remove());
+        const menu = document.createElement("div");
+        menu.className = "more-menu";
+        menu.innerHTML = `
+            <button type="button" class="menu-edit">✎ Edit issue</button>
+            <button type="button" class="menu-delete">Delete issue</button>`;
+        card.appendChild(menu);
+        menu.querySelector(".menu-edit").addEventListener("click", () => {
+            menu.remove();
+            openEditModal(issue);
+        });
+        menu.querySelector(".menu-delete").addEventListener("click", () => {
+            menu.remove();
+            openDeleteModal(issue);
+        });
+    });
+
     return card;
 }
 
@@ -225,6 +251,56 @@ function updateStatistics() {
         i.status !== "Completed" && i.dueDate && i.dueDate < today
     ).length;
 }
+
+function openEditModal(issue) {
+    editTargetIssue = issue;
+    $("editIssueTitle").value = issue.title || "";
+    $("editIssueCategory").value = issue.category || "";
+    $("editIssuePriority").value = issue.priority || "Normal";
+    $("editIssueAssigned").value = issue.assignedTo || "";
+    $("editIssueDueDate").value = issue.dueDate || "";
+    $("editIssueCost").value = Number(issue.cost) || "";
+    $("editIssueStatus").value = issue.status || "Open";
+    $("editIssueDescription").value = issue.description || "";
+    editModal.classList.remove("hidden");
+    setTimeout(() => $("editIssueTitle").focus(), 50);
+}
+function closeEditModal() {
+    editTargetIssue = null;
+    editModal.classList.add("hidden");
+    editIssueForm.reset();
+}
+$("closeEditModalBtn").addEventListener("click", closeEditModal);
+$("cancelEditBtn").addEventListener("click", closeEditModal);
+editModal.addEventListener("click", e => { if (e.target === editModal) closeEditModal(); });
+
+editIssueForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (!editTargetIssue) return;
+    const newStatus = $("editIssueStatus").value;
+    const updates = {
+        title: $("editIssueTitle").value.trim(),
+        category: $("editIssueCategory").value,
+        priority: $("editIssuePriority").value,
+        assignedTo: $("editIssueAssigned").value.trim(),
+        dueDate: $("editIssueDueDate").value,
+        cost: Number($("editIssueCost").value) || 0,
+        status: newStatus,
+        description: $("editIssueDescription").value.trim()
+    };
+    if (newStatus === "Completed") updates.completedAt = editTargetIssue.completedAt || new Date().toISOString();
+    else updates.completedAt = null;
+
+    try {
+        await updateDoc(doc(db, "issues", editTargetIssue.id), updates);
+        closeEditModal();
+        showToast("Issue updated");
+        await loadIssues();
+    } catch (error) {
+        console.error(error);
+        alert("Could not update the issue.");
+    }
+});
 
 function openDeleteModal(issue) {
     deleteTargetIssue = issue;
@@ -310,6 +386,13 @@ function formatDate(value) {
     const d = new Date(`${value}T00:00:00`);
     return d.toLocaleDateString("en-IN", {day:"numeric", month:"short", year:"numeric"});
 }
+function formatDateTime(value) {
+    const d = new Date(value);
+    return d.toLocaleDateString("en-IN", {day:"numeric", month:"short", year:"numeric"});
+}
+document.addEventListener("click", () => {
+    document.querySelectorAll(".more-menu").forEach(m => m.remove());
+});
 function dateValue(value) {
     const n = Date.parse(value || "");
     return Number.isFinite(n) ? n : 0;

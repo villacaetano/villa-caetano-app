@@ -172,6 +172,69 @@
         </div>
     </div>
 
+    <!-- EDIT ISSUE MODAL -->
+    <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <div class="eyebrow">UPDATE TASK</div>
+                    <h2 id="editModalTitle">Edit maintenance issue</h2>
+                </div>
+                <button id="closeEditModalBtn" class="close-button" aria-label="Close">×</button>
+            </div>
+            <form id="editIssueForm">
+                <div class="form-grid">
+                    <label class="full">
+                        Issue title
+                        <input type="text" id="editIssueTitle" required>
+                    </label>
+                    <label>
+                        Category
+                        <select id="editIssueCategory" required>
+                            <option value="">Select category</option>
+                            <option>Pool</option><option>Garden</option><option>Electrical</option>
+                            <option>Plumbing</option><option>Air Conditioning</option><option>Building</option>
+                            <option>Security</option><option>Cleaning</option><option>Furniture</option>
+                            <option>Appliances</option><option>Other</option>
+                        </select>
+                    </label>
+                    <label>
+                        Priority
+                        <select id="editIssuePriority">
+                            <option>Normal</option><option>Low</option><option>High</option><option>Urgent</option>
+                        </select>
+                    </label>
+                    <label>
+                        Assigned to
+                        <input type="text" id="editIssueAssigned" placeholder="e.g. Caretaker">
+                    </label>
+                    <label>
+                        Due date
+                        <input type="date" id="editIssueDueDate">
+                    </label>
+                    <label>
+                        Estimated / actual cost
+                        <input type="number" id="editIssueCost" min="0" step="0.01">
+                    </label>
+                    <label>
+                        Status
+                        <select id="editIssueStatus">
+                            <option>Open</option><option>In Progress</option><option>Waiting</option><option>Completed</option>
+                        </select>
+                    </label>
+                    <label class="full">
+                        Description / notes
+                        <textarea id="editIssueDescription" rows="4" placeholder="Describe the problem or work required…"></textarea>
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancelEditBtn" class="secondary-button">Cancel</button>
+                    <button type="submit" class="primary-button">Save changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- DELETE CONFIRMATION -->
     <div id="deleteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
         <div class="modal-card delete-card">
