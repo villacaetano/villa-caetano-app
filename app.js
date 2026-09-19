@@ -1,5 +1,6 @@
 const sb = window.supabaseClient;
 let session = null, profile = null, issues = [], recurring = [], bills = [], expenses = [], profiles = [];
+let loginBusy = false;
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const money = n => `₹${Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2})}`;
@@ -16,7 +17,10 @@ document.addEventListener('click', e=>{
 });
 
 async function boot(){
-  const {data:{session:s}}=await sb.auth.getSession(); await handleSession(s);
+  if(!sb){ $('loginError').textContent='Supabase could not be initialized. Check supabase.js.'; return; }
+  const {data:{session:s},error:e}=await sb.auth.getSession();
+  if(e){ console.error(e); $('loginError').textContent=e.message; }
+  await handleSession(s);
   sb.auth.onAuthStateChange(async (_e,s)=>{ await handleSession(s); });
 }
 async function handleSession(s){
@@ -41,7 +45,26 @@ async function loadAll(){
   issues=results[0].data||[]; recurring=results[1].data||[]; bills=results[2].data||[]; expenses=results[3].data||[];
 }
 
-$('loginBtn').onclick=async()=>{ $('loginError').textContent=''; const {error:e}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}}); if(e)$('loginError').textContent=e.message; };
+$('loginBtn').onclick=async()=>{
+  if(loginBusy || !sb) return;
+  loginBusy=true;
+  const btn=$('loginBtn');
+  const original=btn.textContent;
+  btn.disabled=true;
+  btn.textContent='Connecting to Google…';
+  $('loginError').textContent='';
+  try{
+    const redirectTo=location.origin+location.pathname;
+    const {error:e}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo}});
+    if(e) throw e;
+  }catch(e){
+    console.error('Google sign-in error:',e);
+    $('loginError').textContent=e?.message||'Unable to start Google sign-in.';
+    btn.disabled=false;
+    btn.textContent=original;
+    loginBusy=false;
+  }
+};
 $('logoutBtn').onclick=()=>sb.auth.signOut();
 $('quickAction').onclick=()=>openIssueModal();
 $('issueSearch').oninput=renderIssues; $('issueStatusFilter').onchange=renderIssues; $('issuePriorityFilter').onchange=renderIssues;
@@ -63,8 +86,8 @@ function openIssueModal(issue=null){
  ${fileField('Issue photos / documents',true)}
  <div class="form-actions"><button type="button" class="secondary" onclick="closeModal()">Cancel</button><button class="primary">${edit?'Save changes':'Report issue'}</button></div></form>`,async fd=>{
   const payload={title:fd.get('title').trim(),category:fd.get('category'),priority:fd.get('priority'),due_date:fd.get('due_date')||null,assigned_to:fd.get('assigned_to')?.trim()||null,cost:Number(fd.get('cost'))||0,description:fd.get('description')?.trim()||null};
-  let res=edit?await sb.from('issues').update(payload).eq('id',issue.id):await sb.from('issues').insert({...payload,created_by:session.user.id}); if(res.error){error(res.error);return;}
-  const id=edit?issue.id:res.data?.[0]?.id; await uploadFiles(fd.getAll('files'), 'issue', id); closeModal(); await loadAll(); renderIssues(); renderDashboard(); toast(edit?'Issue updated':'Issue reported');
+  let res=edit?await sb.from('issues').update(payload).eq('id',issue.id):await sb.from('issues').insert({...payload,created_by:session.user.id}).select().single(); if(res.error){error(res.error);return;}
+  const id=edit?issue.id:res.data?.id; await uploadFiles(fd.getAll('files'), 'issue', id); closeModal(); await loadAll(); renderIssues(); renderDashboard(); toast(edit?'Issue updated':'Issue reported');
  });
 }
 

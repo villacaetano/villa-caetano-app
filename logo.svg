@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" role="img" aria-labelledby="title desc">
+  <title id="title">Villa Caetano</title>
+  <desc id="desc">Villa Caetano wordmark</desc>
+  <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 52 45 25l27 27"/>
+    <path d="M27 47v25h36V47"/>
+    <path d="M39 72V57h12v15"/>
+    <path d="M72 27c9 7 14 15 15 26"/>
+  </g>
+  <text x="104" y="45" fill="currentColor" font-family="Georgia,serif" font-size="29" letter-spacing="1">Villa Caetano</text>
+  <text x="106" y="67" fill="currentColor" font-family="Arial,sans-serif" font-size="10" letter-spacing="3">PROPERTY MANAGEMENT</text>
+</svg>

@@ -1,6 +1,5 @@
-// Supabase client
-// Replace these two values with the Project URL and Publishable key from:
-// Supabase Dashboard -> Project Settings -> API
+// Villa Caetano Supabase client
+// This browser app uses the public Publishable key only.
 const SUPABASE_URL = 'https://xrbzihjymjahzucnkgcb.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_bVUGU3ov93IehLv4bMWfMA_OX_3a3Jq';
 
