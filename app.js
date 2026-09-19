@@ -8,8 +8,20 @@ function esc(v){const d=document.createElement("div");d.textContent=v??"";return
 function money(v){return `₹${Number(v||0).toLocaleString("en-IN",{maximumFractionDigits:2})}`} function fmtDate(v){if(!v)return "";return new Date(`${v}T00:00:00`).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})};
 function fmtDateTime(v){return v?new Date(v).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):""};
 function dateMs(v){const n=Date.parse(v||"");return Number.isFinite(n)?n:0};
-function showToast(m){const t=$("toast");t.textContent=m;t.classList.remove("hidden");clearTimeout(showToast.t);showToast.t=setTimeout(()=>t.classList.add("hidden"),2400)}
-function closeModal(id){$(id).classList.add("hidden");}
+function showToast(m){const t=$("toast");if(!t)return;t.textContent=m;t.classList.remove("hidden");clearTimeout(showToast.t);showToast.t=setTimeout(()=>t.classList.add("hidden"),2400)}
+function closeModal(id){if($(id))$(id).classList.add("hidden");}
+
+// Keep Google login available even if a later UI enhancement has an error.
+const loginButton=$("googleLoginBtn");
+if(loginButton){loginButton.addEventListener("click",async()=>{
+  loginButton.disabled=true;
+  const label=loginButton.querySelector("span:last-child");
+  if(label)label.textContent="Signing in…";
+  try{await signInWithPopup(auth,provider);}
+  catch(e){console.error("Google sign-in error:",e);alert(`Login failed: ${e.code||e.message||"Please try again."}`);}
+  finally{loginButton.disabled=false;if(label)label.textContent="Continue with Google";}
+});}
+
 function setMinDates(){["issueDueDate","editIssueDueDate","recurringNextDue","billNextDue","expenseDate"].forEach(id=>{if($(id))$(id).min=today()})}
 function populateAssigneeMenus(){["assignedMenu","editAssignedMenu","recurringAssignedMenu"].forEach(id=>{const m=$(id);m.innerHTML=ASSIGNEES.map(x=>`<label><input type="checkbox" value="${esc(x)}"><span>${esc(x)}</span></label>`).join("")+`<input class="assigned-other" placeholder="Optional name / company"><button type="button" class="done-select-button">Done</button>`;});}
 function picker(menuId,buttonId,textId){const m=$(menuId),b=$(buttonId),t=$(textId);b.onclick=e=>{e.stopPropagation();document.querySelectorAll(".multi-select-menu").forEach(x=>x.classList.add("hidden"));m.classList.toggle("hidden")};m.addEventListener("click",e=>e.stopPropagation());m.querySelector(".done-select-button").onclick=()=>m.classList.add("hidden");m.addEventListener("change",()=>updatePicker(m,t,b));m.querySelector(".assigned-other").addEventListener("input",()=>updatePicker(m,t,b));return {m,b,t}}
@@ -18,7 +30,6 @@ function getPickerValues(m){const vals=[...m.querySelectorAll('input[type="check
 function setPickerValues(m,b,t,raw){const vals=Array.isArray(raw)?raw:(raw?[raw]:[]);m.querySelectorAll('input[type="checkbox"]').forEach(x=>x.checked=vals.includes(x.value));const known=new Set(ASSIGNEES);m.querySelector(".assigned-other").value=vals.filter(x=>!known.has(x)).join(", ");updatePicker(m,t,b)}
 populateAssigneeMenus();const addPick=picker("assignedMenu","assignedButton","assignedButtonText"),editPick=picker("editAssignedMenu","editAssignedButton","editAssignedButtonText"),recPick=picker("recurringAssignedMenu","recurringAssignedButton","recurringAssignedButtonText");
 document.addEventListener("click",()=>document.querySelectorAll(".multi-select-menu,.more-menu").forEach(x=>x.classList.add("hidden")));
-$("googleLoginBtn").onclick=async()=>{const b=$("googleLoginBtn");b.disabled=true;b.querySelector("span:last-child").textContent="Signing in…";try{await signInWithPopup(auth,provider)}catch(e){console.error(e);alert(`Login failed: ${e.code||e.message}`)}finally{b.disabled=false;b.querySelector("span:last-child").textContent="Continue with Google"}};
 $("logoutBtn").onclick=()=>signOut(auth);
 onAuthStateChanged(auth,async u=>{if(!u){currentUser=null;$("loginScreen").classList.remove("hidden");$("app").classList.add("hidden");return}currentUser=u;$("loginScreen").classList.add("hidden");$("app").classList.remove("hidden");$("userName").textContent=u.displayName||u.email||"User";$("userAvatar").textContent=(u.displayName||u.email||"VC").split(/\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase();await loadRole();await loadAll();setMinDates();});
 async function loadRole(){try{const s=await getDoc(doc(db,"users",currentUser.uid));role=s.exists()?(s.data().role||"reporter"):"reporter"}catch(e){console.error(e);role="reporter"}$("roleBadge").textContent=isAdmin()?"ADMIN":"REPORTER";$("userRoleText").textContent=isAdmin()?"Owner / Property manager":"Report & view";document.querySelectorAll(".admin-only").forEach(x=>x.classList.toggle("hidden",!isAdmin()))}
