@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#173b32">
+  <title>Villa Caetano — Property Management</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app-error" class="app-error hidden"></div>
+
+  <section id="auth-view" class="auth-shell">
+    <div class="auth-card">
+      <div class="brand brand-centered">
+        <img src="logo.svg" alt="Villa Caetano logo" class="brand-logo">
+        <div>
+          <div class="brand-name">Villa Caetano</div>
+          <div class="brand-subtitle">Property Management</div>
+        </div>
+      </div>
+
+      <div id="login-panel">
+        <h1>Welcome back</h1>
+        <p class="muted">Sign in to manage Villa Caetano.</p>
+        <form id="login-form" class="form-grid">
+          <label>Email<input id="login-email" type="email" autocomplete="email" required></label>
+          <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
+          <button class="btn btn-primary" type="submit">Sign In</button>
+        </form>
+        <button id="forgot-password-btn" class="link-button">Forgot password?</button>
+      </div>
+
+      <div id="forgot-panel" class="hidden">
+        <h1>Reset password</h1>
+        <p class="muted">We'll send a secure password-reset link to your email.</p>
+        <form id="forgot-form" class="form-grid">
+          <label>Email<input id="forgot-email" type="email" autocomplete="email" required></label>
+          <button class="btn btn-primary" type="submit">Send reset link</button>
+        </form>
+        <button id="back-to-login-btn" class="link-button">Back to sign in</button>
+      </div>
+
+      <div id="set-password-panel" class="hidden">
+        <h1>Set your password</h1>
+        <p class="muted">Choose a password to finish setting up your account.</p>
+        <form id="set-password-form" class="form-grid">
+          <label>New password<input id="new-password" type="password" minlength="8" autocomplete="new-password" required></label>
+          <label>Confirm password<input id="confirm-password" type="password" minlength="8" autocomplete="new-password" required></label>
+          <button class="btn btn-primary" type="submit">Set Password</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="main-view" class="hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <img src="logo.svg" alt="" class="brand-logo">
+        <div><strong>Villa Caetano</strong><small>Property Management</small></div>
+      </div>
+      <nav id="nav">
+        <button class="nav-item active" data-section="dashboard">Dashboard</button>
+        <button class="nav-item" data-section="maintenance">Maintenance</button>
+        <button class="nav-item" data-section="recurring">Recurring</button>
+        <button class="nav-item" data-section="bills">Bills</button>
+        <button class="nav-item" data-section="expenses">Expenses</button>
+        <button class="nav-item admin-only" data-section="admin">Admin</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="current-user-mini" class="user-mini"></div>
+        <button id="logout-btn" class="nav-item logout">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <button id="menu-btn" class="icon-btn mobile-only" aria-label="Open menu">☰</button>
+        <div>
+          <div id="page-kicker" class="eyebrow">Villa Caetano</div>
+          <h1 id="page-title">Dashboard</h1>
+        </div>
+        <div id="header-user" class="header-user"></div>
+      </header>
+
+      <div id="page-content"></div>
+    </main>
+  </section>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
